@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,6 +45,14 @@ func (c *APIClient) PanelName() string {
 	return c.panel.Name
 }
 
+func (c *APIClient) apiBaseURL() string {
+	return fmt.Sprintf("%s:%d", c.panel.Address, c.panel.APIPort)
+}
+
+func (c *APIClient) subBaseURL() string {
+	return fmt.Sprintf("%s:%d", c.panel.Address, c.panel.SubPort)
+}
+
 func (c *APIClient) Login(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -58,8 +65,8 @@ func (c *APIClient) Login(ctx context.Context) error {
 	form.Set("username", c.panel.Username)
 	form.Set("password", c.panel.Password)
 
-	reqURL := c.panel.Address + c.panel.BasePath + "login"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(form.Encode()))
+	reqURL := c.apiBaseURL() + c.panel.BasePath + "login"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewBufferString(form.Encode()))
 	if err != nil {
 		return fmt.Errorf("creating login request: %w", err)
 	}
@@ -129,7 +136,7 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 }
 
 func (c *APIClient) FetchSubscription(ctx context.Context, subId string) ([]byte, error) {
-	reqURL := c.panel.Address + c.panel.SubPath + subId
+	reqURL := c.subBaseURL() + c.panel.SubPath + subId
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating subscription request: %w", err)
@@ -210,7 +217,7 @@ func (c *APIClient) ensureLoggedIn(ctx context.Context) error {
 }
 
 func (c *APIClient) executeRequest(ctx context.Context, method, path string, jsonBody []byte) ([]byte, int, error) {
-	reqURL := c.panel.Address + c.panel.BasePath + path
+	reqURL := c.apiBaseURL() + c.panel.BasePath + path
 
 	var bodyReader io.Reader
 	if jsonBody != nil {

@@ -74,10 +74,18 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var updateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Check for updates and install the latest version",
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdUpdate()
+	},
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath(), "path to config file")
 
-	rootCmd.AddCommand(runCmd, startCmd, stopCmd, restartCmd, statusCmd, configCmd, versionCmd)
+	rootCmd.AddCommand(runCmd, startCmd, stopCmd, restartCmd, statusCmd, configCmd, versionCmd, updateCmd)
 }
 
 func main() {

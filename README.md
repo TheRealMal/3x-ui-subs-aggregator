@@ -83,7 +83,12 @@ Each panel in the config requires two paths (both must start and end with `/`):
 - **`base_path`** — the panel base path used for API calls (login, inbounds, client management). This is the Panel URI Root Path from your 3X-UI settings. Default: `/panel/`
 - **`sub_path`** — the **JSON Subscription Path** from your 3X-UI panel settings (Panel Settings → Subscription → Json Subscription Path), **not** the regular Sub URI Path. Default: `/json/`
 
-The `address` field should contain only the host and port (e.g., `https://panel.example.com:2053`), without any path.
+Each panel also has separate ports for the API and subscription endpoints:
+
+- **`api_port`** — port for panel API calls. Default: `2053`
+- **`sub_port`** — port for JSON subscription endpoint. Default: `2053`
+
+The `address` field should contain only the scheme and host (e.g., `https://panel.example.com`), without any port or path.
 
 ## Setup
 
@@ -135,15 +140,19 @@ The `address` field should contain only the host and port (e.g., `https://panel.
 
    panels:
       - name: "server-1"
-         address: "https://panel1.example.com:2053"  # host and port only
+         address: "https://panel1.example.com"  # scheme and host only
          username: "admin"
          password: "admin"
-         base_path: "/panel/"  # Panel base path for API calls (starts and ends with /)
-         sub_path: "/json/"    # JSON Sub URI Path from 3X-UI panel settings (starts and ends with /)
+         api_port: 2053       # Port for panel API
+         sub_port: 443        # Port for JSON subscription endpoint
+         base_path: "/panel/" # Panel base path for API calls (starts and ends with /)
+         sub_path: "/json/"   # JSON Sub URI Path from 3X-UI panel settings (starts and ends with /)
       - name: "server-2"
-         address: "https://panel2.example.com:2053"
+         address: "https://panel2.example.com"
          username: "admin"
          password: "admin"
+         api_port: 2053
+         sub_port: 443
          base_path: "/another-admin/"
          sub_path: "/json/"
 
@@ -168,6 +177,7 @@ subs-aggregator status    # Check if running
 subs-aggregator config    # Show config file path
 subs-aggregator run       # Run in foreground (for debugging)
 subs-aggregator version   # Show version
+subs-aggregator update    # Check for updates and install the latest version
 ```
 
 ## Building from Source

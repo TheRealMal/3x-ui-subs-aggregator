@@ -12,6 +12,8 @@ import (
 
 const (
 	DefaultPort     = 8080
+	DefaultAPIPort  = 2053
+	DefaultSubPort  = 2053
 	DefaultBasePath = "/panel/"
 	DefaultSubPath  = "/json/"
 	DefaultLogLevel = "info"
@@ -50,6 +52,8 @@ type PanelConfig struct {
 	Address  string `yaml:"address"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+	APIPort  int    `yaml:"api_port"`
+	SubPort  int    `yaml:"sub_port"`
 	BasePath string `yaml:"base_path"`
 	SubPath  string `yaml:"sub_path"`
 }
@@ -87,6 +91,12 @@ func (c *Config) setDefaults() {
 	}
 	for i := range c.Panels {
 		c.Panels[i].Address = strings.TrimRight(c.Panels[i].Address, "/")
+		if c.Panels[i].APIPort == 0 {
+			c.Panels[i].APIPort = DefaultAPIPort
+		}
+		if c.Panels[i].SubPort == 0 {
+			c.Panels[i].SubPort = DefaultSubPort
+		}
 		if c.Panels[i].BasePath == "" {
 			c.Panels[i].BasePath = DefaultBasePath
 		}

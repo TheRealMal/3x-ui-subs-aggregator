@@ -126,6 +126,7 @@ print_success() {
     ${APP_NAME} status    Check if running
     ${APP_NAME} run       Run in foreground
     ${APP_NAME} version   Show version
+    ${APP_NAME} update    Check and install updates
 
 DONE
 }
