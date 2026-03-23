@@ -96,7 +96,7 @@ func (c *APIClient) Login(ctx context.Context) error {
 }
 
 func (c *APIClient) ListInbounds(ctx context.Context) ([]Inbound, error) {
-	data, err := c.do(ctx, http.MethodGet, "api/inbounds/list", nil)
+	data, err := c.do(ctx, http.MethodGet, "panel/api/inbounds/list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing inbounds: %w", err)
 	}
@@ -126,7 +126,7 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 		Settings: string(settingsJSON),
 	}
 
-	data, err := c.do(ctx, http.MethodPost, "api/inbounds/addClient", addReq)
+	data, err := c.do(ctx, http.MethodPost, "panel/api/inbounds/addClient", addReq)
 	if err != nil {
 		return fmt.Errorf("adding client: %w", err)
 	}
@@ -160,7 +160,7 @@ func (c *APIClient) FetchSubscription(ctx context.Context, subId string) ([]byte
 }
 
 func (c *APIClient) GetClientTraffic(ctx context.Context, email string) (*ClientTraffic, error) {
-	data, err := c.do(ctx, http.MethodGet, "api/inbounds/getClientTraffics/"+email, nil)
+	data, err := c.do(ctx, http.MethodGet, "panel/api/inbounds/getClientTraffics/"+email, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting client traffic: %w", err)
 	}
