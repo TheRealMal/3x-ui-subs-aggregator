@@ -1,5 +1,5 @@
-/3x-ui-sub-unifier
-/unifier
+/subs-aggregator
+subs-aggregator-*
 configs/config.yaml
 *.pid
 *.log

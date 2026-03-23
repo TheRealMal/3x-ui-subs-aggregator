@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"3x-ui-sub-unifier/internal/service"
+	"subs-aggregator/internal/service"
 )
 
 type AdminHandler struct {

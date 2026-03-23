@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"3x-ui-sub-unifier/internal/xui"
+	"subs-aggregator/internal/xui"
 )
 
 type SubscriptionService struct {

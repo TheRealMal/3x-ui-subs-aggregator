@@ -1,6 +1,14 @@
-# 3X-UI Subscription Unifier
+# 3X-UI Subs Aggregator
 
 A lightweight Go service that aggregates subscription configs from multiple [3X-UI](https://github.com/MHSanaei/3x-ui) panels into a single unified subscription endpoint.
+
+## Quick Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealMal/3X-UI-Subs-aggregator/main/install.sh | bash
+```
+
+This downloads the latest release binary for your platform, installs it to `/usr/local/bin`, and creates a config template at `/etc/subs-aggregator/config.yaml`.
 
 ## Features
 
@@ -70,12 +78,38 @@ Returns the unified subscription URL that aggregates configs for this user from 
 
 ## Setup
 
-1. Copy and edit the config:
+### Quick Install (binary)
+
+1. Run the install script:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/TheRealMal/3X-UI-Subs-aggregator/main/install.sh | bash
+   ```
+
+2. Edit the config:
+   ```bash
+   sudo nano /etc/subs-aggregator/config.yaml
+   ```
+
+3. Start the service:
+   ```bash
+   subs-aggregator start
+   ```
+
+### From Source
+
+1. Clone and build:
+   ```bash
+   git clone https://github.com/TheRealMal/3X-UI-Subs-aggregator.git
+   cd 3X-UI-Subs-aggregator
+   go build -o subs-aggregator ./cmd/subs-aggregator/
+   ```
+
+2. Copy and edit the config:
    ```bash
    cp configs/config.example.yaml configs/config.yaml
    ```
 
-2. Fill in your panel details in `configs/config.yaml`:
+3. Fill in your panel details in `configs/config.yaml`:
    ```yaml
    server:
      port: 8080
@@ -99,21 +133,27 @@ Returns the unified subscription URL that aggregates configs for this user from 
 
    At least 2 panels are required.
 
-3. Build and start:
+4. Run:
    ```bash
-   ./scripts/unifier.sh start
+   ./subs-aggregator start
    ```
 
 ## Management
 
 ```bash
-./scripts/unifier.sh start    # Build (if needed) and start in background
-./scripts/unifier.sh stop     # Graceful stop
-./scripts/unifier.sh restart  # Stop + start
-./scripts/unifier.sh status   # Check if running
-./scripts/unifier.sh build    # Build binary only
+subs-aggregator start     # Start in background
+subs-aggregator stop      # Graceful stop
+subs-aggregator restart   # Stop + start
+subs-aggregator status    # Check if running
+subs-aggregator config    # Show config file path
+subs-aggregator run       # Run in foreground (for debugging)
+subs-aggregator version   # Show version
 ```
 
-## Requirements
+## Building from Source
 
-- Go 1.24+
+Requires Go 1.24+.
+
+```bash
+go build -o subs-aggregator ./cmd/subs-aggregator/
+```

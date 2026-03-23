@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"3x-ui-sub-unifier/internal/xui"
+	"subs-aggregator/internal/xui"
 
 	"github.com/google/uuid"
 )

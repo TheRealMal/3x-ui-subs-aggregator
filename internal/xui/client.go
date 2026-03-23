@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"3x-ui-sub-unifier/internal/config"
+	"subs-aggregator/internal/config"
 )
 
 type APIClient struct {
