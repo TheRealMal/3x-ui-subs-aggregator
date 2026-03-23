@@ -50,7 +50,7 @@ type xrayConfig struct {
 // {"outbounds": [...]} or a raw JSON array [...].
 func parseOutbounds(data []byte) ([]json.RawMessage, error) {
 	var cfg xrayConfig
-	if err := json.Unmarshal(data, &cfg); err == nil {
+	if err := json.Unmarshal(data, &cfg); err == nil && len(cfg.Outbounds) > 0 {
 		return cfg.Outbounds, nil
 	}
 
@@ -58,6 +58,20 @@ func parseOutbounds(data []byte) ([]json.RawMessage, error) {
 	if err := json.Unmarshal(data, &arr); err != nil {
 		return nil, fmt.Errorf("expected JSON object with outbounds or JSON array: %w", err)
 	}
+
+	// Array of full xray configs — extract outbounds from each element.
+	var outbounds []json.RawMessage
+	for _, item := range arr {
+		var nested xrayConfig
+		if err := json.Unmarshal(item, &nested); err == nil && len(nested.Outbounds) > 0 {
+			outbounds = append(outbounds, nested.Outbounds...)
+		}
+	}
+	if len(outbounds) > 0 {
+		return outbounds, nil
+	}
+
+	// Plain array of outbound objects.
 	return arr, nil
 }
 
