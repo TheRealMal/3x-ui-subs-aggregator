@@ -38,26 +38,24 @@ Admin endpoints require the `secret` query parameter matching `admin_secret` fro
 
 ### List Inbounds
 
-```
-GET /admin/inbounds?secret=your-secret
+```bash
+curl -s 'https://your-domain.com:8080/admin/inbounds?secret=your-secret' | jq
 ```
 
 Returns all inbounds from all configured panels with their IDs, remarks, protocols, ports, and enabled status. Use the **remark** values from this response as the `inbounds` parameter when creating a client.
 
 ### Create Client
 
-```
-POST /admin/clients?secret=your-secret
-```
-
-```json
-{
-  "name": "therealmal-mac",
-  "inbounds": ["vless-reality", "vmess-ws"],
-  "totalGB": 0,
-  "expiryTime": 0,
-  "limitIp": 2
-}
+```bash
+curl -s -X POST 'https://your-domain.com:8080/admin/clients?secret=your-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "therealmal-mac",
+    "inbounds": ["vless-reality", "vmess-ws"],
+    "totalGB": 0,
+    "expiryTime": 0,
+    "limitIp": 2
+  }' | jq
 ```
 
 - **`name`** (required) — client identifier, used to derive the subscription URL and as the base for per-inbound emails (`therealmal-mac-1`, `therealmal-mac-2`, ...)
@@ -70,8 +68,8 @@ The service generates a shared UUID for the client and adds it to every target i
 
 ### Get Subscription URL
 
-```
-GET /admin/sub-url/therealmal-mac?secret=your-secret
+```bash
+curl -s 'https://your-domain.com:8080/admin/sub-url/therealmal-mac?secret=your-secret' | jq
 ```
 
 Returns the unified subscription URL that aggregates configs for this user from all panels.
