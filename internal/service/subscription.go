@@ -46,6 +46,21 @@ type xrayConfig struct {
 	Outbounds []json.RawMessage `json:"outbounds"`
 }
 
+// parseOutbounds extracts outbounds from a panel response that is either
+// {"outbounds": [...]} or a raw JSON array [...].
+func parseOutbounds(data []byte) ([]json.RawMessage, error) {
+	var cfg xrayConfig
+	if err := json.Unmarshal(data, &cfg); err == nil {
+		return cfg.Outbounds, nil
+	}
+
+	var arr []json.RawMessage
+	if err := json.Unmarshal(data, &arr); err != nil {
+		return nil, fmt.Errorf("expected JSON object with outbounds or JSON array: %w", err)
+	}
+	return arr, nil
+}
+
 // MergeSubscriptions fetches JSON subscriptions from all panels concurrently and merges the outbounds.
 func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId string) ([]byte, error) {
 	results := make([]subscriptionResult, len(s.clients))
@@ -80,8 +95,8 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 			continue
 		}
 
-		var cfg xrayConfig
-		if err := json.Unmarshal(res.data, &cfg); err != nil {
+		outbounds, err := parseOutbounds(res.data)
+		if err != nil {
 			s.logger.Warn("failed to parse JSON subscription",
 				"panel", res.panel,
 				"error", err,
@@ -90,7 +105,7 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 			continue
 		}
 
-		allOutbounds = append(allOutbounds, cfg.Outbounds...)
+		allOutbounds = append(allOutbounds, outbounds...)
 		successCount++
 	}
 
@@ -104,5 +119,5 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 		"totalOutbounds", len(allOutbounds),
 	)
 
-	return json.Marshal(allOutbounds)
+	return json.Marshal(xrayConfig{Outbounds: allOutbounds})
 }
