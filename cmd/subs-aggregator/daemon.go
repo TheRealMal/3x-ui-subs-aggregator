@@ -102,11 +102,21 @@ func cmdRun(cfgPath string) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
+	certFile, keyFile, useTLS := cfg.ResolveTLS(logger)
+
 	go func() {
-		logger.Info("starting server", "addr", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server error", "error", err)
-			os.Exit(1)
+		if useTLS {
+			logger.Info("starting HTTPS server", "addr", srv.Addr, "cert", certFile, "key", keyFile)
+			if err := srv.ListenAndServeTLS(certFile, keyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Error("server error", "error", err)
+				os.Exit(1)
+			}
+		} else {
+			logger.Info("starting HTTP server", "addr", srv.Addr)
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Error("server error", "error", err)
+				os.Exit(1)
+			}
 		}
 	}()
 

@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,7 +13,17 @@ const (
 	DefaultPort     = 8080
 	DefaultSubPath  = "/sub"
 	DefaultLogLevel = "info"
+
+	certBaseDir   = "/root/cert"
+	certIPBaseDir = "/root/cert/ip"
 )
+
+// Common certificate file name pairs to search for (cert, key).
+var certFilePatterns = []struct{ cert, key string }{
+	{"fullchain.pem", "privkey.pem"},
+	{"cert.pem", "key.pem"},
+	{"fullchain.cer", "privkey.key"},
+}
 
 type Config struct {
 	Server ServerConfig  `yaml:"server"`
@@ -20,8 +32,15 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port        int    `yaml:"port"`
-	AdminSecret string `yaml:"admin_secret"`
+	Port        int       `yaml:"port"`
+	AdminSecret string    `yaml:"admin_secret"`
+	TLS         TLSConfig `yaml:"tls"`
+}
+
+type TLSConfig struct {
+	Domain   string `yaml:"domain"`
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 type PanelConfig struct {
@@ -90,5 +109,76 @@ func (c *Config) validate() error {
 		}
 	}
 
+	// Validate explicit TLS paths if provided
+	tls := c.Server.TLS
+	if tls.CertFile != "" || tls.KeyFile != "" {
+		if tls.CertFile == "" || tls.KeyFile == "" {
+			return fmt.Errorf("both tls.cert_file and tls.key_file must be set together")
+		}
+		if _, err := os.Stat(tls.CertFile); err != nil {
+			return fmt.Errorf("tls.cert_file not found: %s", tls.CertFile)
+		}
+		if _, err := os.Stat(tls.KeyFile); err != nil {
+			return fmt.Errorf("tls.key_file not found: %s", tls.KeyFile)
+		}
+	}
+
 	return nil
+}
+
+// ResolveTLS attempts to find TLS certificate and key files.
+// Priority: explicit config > domain-based auto-discovery > IP-based auto-discovery.
+// Returns (certFile, keyFile, true) if found, or ("", "", false) if TLS should not be used.
+func (c *Config) ResolveTLS(logger *slog.Logger) (certFile, keyFile string, ok bool) {
+	tls := c.Server.TLS
+
+	// 1. Explicit paths take highest priority (already validated).
+	if tls.CertFile != "" && tls.KeyFile != "" {
+		logger.Info("using explicit TLS certificates", "cert", tls.CertFile, "key", tls.KeyFile)
+		return tls.CertFile, tls.KeyFile, true
+	}
+
+	// 2. Auto-discover by domain: /root/cert/<domain>/
+	if tls.Domain != "" {
+		dir := filepath.Join(certBaseDir, tls.Domain)
+		if cert, key, found := findCertPairInDir(dir); found {
+			logger.Info("auto-discovered TLS certificates by domain", "domain", tls.Domain, "cert", cert, "key", key)
+			return cert, key, true
+		}
+		logger.Debug("no TLS certificates found for domain", "domain", tls.Domain, "dir", dir)
+	}
+
+	// 3. Auto-discover by IP: /root/cert/ip/<ip>/
+	if entries, err := os.ReadDir(certIPBaseDir); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			dir := filepath.Join(certIPBaseDir, entry.Name())
+			if cert, key, found := findCertPairInDir(dir); found {
+				logger.Info("auto-discovered TLS certificates by IP", "ip", entry.Name(), "cert", cert, "key", key)
+				return cert, key, true
+			}
+		}
+	}
+
+	logger.Info("no TLS certificates found, server will use plain HTTP")
+	return "", "", false
+}
+
+// findCertPairInDir checks a directory for known certificate+key file name patterns.
+func findCertPairInDir(dir string) (certFile, keyFile string, found bool) {
+	for _, p := range certFilePatterns {
+		cert := filepath.Join(dir, p.cert)
+		key := filepath.Join(dir, p.key)
+		if fileExists(cert) && fileExists(key) {
+			return cert, key, true
+		}
+	}
+	return "", "", false
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
