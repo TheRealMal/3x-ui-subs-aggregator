@@ -36,6 +36,9 @@ func NewAPIClient(panel config.PanelConfig, logger *slog.Logger) *APIClient {
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 		logger: logger,
 	}
@@ -195,15 +198,24 @@ func (c *APIClient) do(ctx context.Context, method, path string, body any) ([]by
 		return nil, err
 	}
 
-	if statusCode == http.StatusUnauthorized {
+	// Treat 401 or 3xx redirects (e.g. redirect to login page) as session expired.
+	if statusCode == http.StatusUnauthorized || (statusCode >= 300 && statusCode < 400) {
 		c.loggedIn.Store(false)
 		if err := c.ensureLoggedIn(ctx); err != nil {
 			return nil, err
 		}
-		data, _, err = c.executeRequest(ctx, method, path, jsonBody)
+		data, statusCode, err = c.executeRequest(ctx, method, path, jsonBody)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if statusCode != http.StatusOK {
+		preview := string(data)
+		if len(preview) > 200 {
+			preview = preview[:200] + "..."
+		}
+		return nil, fmt.Errorf("unexpected status %d from panel (body: %q)", statusCode, preview)
 	}
 
 	return data, nil
@@ -231,6 +243,7 @@ func (c *APIClient) executeRequest(ctx context.Context, method, path string, jso
 	if jsonBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -243,13 +256,30 @@ func (c *APIClient) executeRequest(ctx context.Context, method, path string, jso
 		return nil, resp.StatusCode, fmt.Errorf("reading response body: %w", err)
 	}
 
+	c.logger.Debug("API response",
+		"panel", c.panel.Name,
+		"method", method,
+		"path", path,
+		"status", resp.StatusCode,
+		"bodyLen", len(data),
+	)
+
 	return data, resp.StatusCode, nil
 }
 
 func parseAPIResponse(data []byte) (APIResponse, error) {
+	if len(data) == 0 {
+		return APIResponse{}, fmt.Errorf("empty response body from panel")
+	}
+
 	var resp APIResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
-		return resp, fmt.Errorf("decoding API response: %w", err)
+		// Truncate body for logging to avoid dumping huge HTML pages.
+		preview := string(data)
+		if len(preview) > 200 {
+			preview = preview[:200] + "..."
+		}
+		return resp, fmt.Errorf("decoding API response (body: %q): %w", preview, err)
 	}
 	if !resp.Success {
 		return resp, fmt.Errorf("API error: %s", resp.Msg)
