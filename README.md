@@ -5,7 +5,7 @@ A lightweight Go service that aggregates subscription configs from multiple [3X-
 ## Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TheRealMal/3X-UI-Subs-aggregator/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/TheRealMal/3x-ui-subs-aggregator/main/install.sh | bash
 ```
 
 This downloads the latest release binary for your platform, installs it to `/usr/local/bin`, and creates a config template at `/etc/subs-aggregator/config.yaml`.
@@ -82,7 +82,7 @@ Returns the unified subscription URL that aggregates configs for this user from 
 
 1. Run the install script:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/TheRealMal/3X-UI-Subs-aggregator/main/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/TheRealMal/3x-ui-subs-aggregator/main/install.sh | bash
    ```
 
 2. Edit the config:
@@ -99,8 +99,8 @@ Returns the unified subscription URL that aggregates configs for this user from 
 
 1. Clone and build:
    ```bash
-   git clone https://github.com/TheRealMal/3X-UI-Subs-aggregator.git
-   cd 3X-UI-Subs-aggregator
+   git clone https://github.com/TheRealMal/3x-ui-subs-aggregator.git
+   cd 3x-ui-subs-aggregator
    go build -o subs-aggregator ./cmd/subs-aggregator/
    ```
 

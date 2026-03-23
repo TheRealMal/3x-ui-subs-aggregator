@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="TheRealMal/3X-UI-Subs-aggregator"
+REPO="TheRealMal/3x-ui-subs-aggregator"
 APP_NAME="subs-aggregator"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/${APP_NAME}"
