@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -24,38 +25,15 @@ func NewSubscriptionService(clients []*xui.APIClient, logger *slog.Logger) *Subs
 	}
 }
 
-// FindSubIDByEmail searches all panels for a client with the given email and returns its subscription ID.
-func (s *SubscriptionService) FindSubIDByEmail(ctx context.Context, email string) (string, error) {
-	for _, panelClient := range s.clients {
-		inbounds, err := panelClient.ListInbounds(ctx)
-		if err != nil {
-			s.logger.Warn("failed to list inbounds",
-				"panel", panelClient.PanelName(),
-				"error", err,
-			)
-			continue
-		}
+// HashName computes the SHA256 hash of a name, used as the deterministic subscription ID.
+func HashName(name string) string {
+	h := sha256.Sum256([]byte(name))
+	return hex.EncodeToString(h[:])
+}
 
-		for _, inbound := range inbounds {
-			var settings xui.InboundSettings
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
-				s.logger.Warn("failed to unmarshal inbound settings",
-					"panel", panelClient.PanelName(),
-					"inboundID", inbound.ID,
-					"error", err,
-				)
-				continue
-			}
-
-			for _, client := range settings.Clients {
-				if client.Email == email {
-					return client.SubId, nil
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("client with email %q not found", email)
+// BuildSubURL computes the subscription URL for the given client name.
+func BuildSubURL(host, name string) string {
+	return fmt.Sprintf("%s/sub/%s", host, HashName(name))
 }
 
 type subscriptionResult struct {
@@ -71,15 +49,15 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 
 	for i, panelClient := range s.clients {
 		wg.Add(1)
-		go func(idx int, pc *xui.APIClient) {
+		go func() {
 			defer wg.Done()
-			data, err := pc.FetchSubscription(ctx, subId)
-			results[idx] = subscriptionResult{
-				panel: pc.PanelName(),
+			data, err := panelClient.FetchSubscription(ctx, subId)
+			results[i] = subscriptionResult{
+				panel: panelClient.PanelName(),
 				data:  data,
 				err:   err,
 			}
-		}(i, panelClient)
+		}()
 	}
 
 	wg.Wait()
@@ -137,12 +115,3 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 	return encoded, nil
 }
 
-// BuildSubURL finds the subscription ID for the given email and returns a subscription URL.
-func (s *SubscriptionService) BuildSubURL(ctx context.Context, host string, email string) (string, error) {
-	subId, err := s.FindSubIDByEmail(ctx, email)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/sub/%s", host, subId), nil
-}

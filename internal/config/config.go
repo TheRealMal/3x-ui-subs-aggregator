@@ -20,7 +20,8 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port int `yaml:"port"`
+	Port        int    `yaml:"port"`
+	AdminSecret string `yaml:"admin_secret"`
 }
 
 type PanelConfig struct {
@@ -70,6 +71,9 @@ func (c *Config) setDefaults() {
 }
 
 func (c *Config) validate() error {
+	if c.Server.AdminSecret == "" {
+		return fmt.Errorf("server.admin_secret is required")
+	}
 	if len(c.Panels) < 2 {
 		return fmt.Errorf("at least 2 panels are required, got %d", len(c.Panels))
 	}

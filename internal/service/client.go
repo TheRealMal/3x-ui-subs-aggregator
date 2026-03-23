@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"3x-ui-sub-unifier/internal/xui"
 
@@ -12,7 +11,7 @@ import (
 )
 
 type CreateClientRequest struct {
-	Email      string `json:"email"`
+	Name       string `json:"name"`
 	InboundIDs []int  `json:"inboundIds"`
 	TotalGB    int64  `json:"totalGB"`
 	ExpiryTime int64  `json:"expiryTime"`
@@ -41,7 +40,7 @@ func NewClientService(clients []*xui.APIClient, logger *slog.Logger) *ClientServ
 // CreateClientAcrossPanels creates a client with the same credentials across all panels and requested inbounds.
 func (s *ClientService) CreateClientAcrossPanels(ctx context.Context, req CreateClientRequest) ([]CreateClientResult, error) {
 	clientUUID := uuid.New().String()
-	subId := strings.ReplaceAll(uuid.New().String(), "-", "")[:16]
+	subId := HashName(req.Name)
 
 	var results []CreateClientResult
 
@@ -81,7 +80,7 @@ func (s *ClientService) CreateClientAcrossPanels(ctx context.Context, req Create
 			}
 
 			newClient := xui.Client{
-				Email:      req.Email,
+				Email:      req.Name,
 				Enable:     true,
 				SubId:      subId,
 				TotalGB:    req.TotalGB,
@@ -100,7 +99,7 @@ func (s *ClientService) CreateClientAcrossPanels(ctx context.Context, req Create
 				s.logger.Warn("failed to add client",
 					"panel", panelClient.PanelName(),
 					"inboundID", inboundID,
-					"email", req.Email,
+					"name", req.Name,
 					"error", err,
 				)
 				results = append(results, CreateClientResult{
@@ -115,7 +114,7 @@ func (s *ClientService) CreateClientAcrossPanels(ctx context.Context, req Create
 			s.logger.Info("client added successfully",
 				"panel", panelClient.PanelName(),
 				"inboundID", inboundID,
-				"email", req.Email,
+				"name", req.Name,
 			)
 			results = append(results, CreateClientResult{
 				Panel:     panelClient.PanelName(),

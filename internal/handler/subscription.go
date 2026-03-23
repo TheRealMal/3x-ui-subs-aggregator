@@ -3,7 +3,6 @@ package handler
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"3x-ui-sub-unifier/internal/service"
 )
@@ -21,7 +20,7 @@ func NewSubscriptionHandler(subService *service.SubscriptionService, logger *slo
 }
 
 func (h *SubscriptionHandler) HandleSubscription(w http.ResponseWriter, r *http.Request) {
-	subId := strings.TrimPrefix(r.URL.Path, "/sub/")
+	subId := r.PathValue("subId")
 	if subId == "" {
 		http.Error(w, "missing subscription id", http.StatusBadRequest)
 		return

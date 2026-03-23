@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -47,13 +48,13 @@ func main() {
 	clientService := service.NewClientService(xuiClients, logger)
 
 	subHandler := handler.NewSubscriptionHandler(subService, logger)
-	adminHandler := handler.NewAdminHandler(subService, clientService, logger)
+	adminHandler := handler.NewAdminHandler(clientService, logger, cfg.Server.AdminSecret)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/sub/", subHandler.HandleSubscription)
-	mux.HandleFunc("/admin/sub-url/", adminHandler.HandleGetSubURL)
-	mux.HandleFunc("/admin/clients", adminHandler.HandleCreateClient)
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /sub/{subId}", subHandler.HandleSubscription)
+	mux.HandleFunc("GET /admin/sub-url/{name}", adminHandler.HandleGetSubURL)
+	mux.HandleFunc("POST /admin/clients", adminHandler.HandleCreateClient)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
 
@@ -70,7 +71,7 @@ func main() {
 
 	go func() {
 		logger.Info("starting server", "addr", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server error", "error", err)
 			os.Exit(1)
 		}
@@ -104,14 +105,9 @@ func withLogging(logger *slog.Logger, next http.Handler) http.Handler {
 }
 
 func parseLogLevel(s string) slog.Level {
-	switch s {
-	case "debug":
-		return slog.LevelDebug
-	case "warn":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(s)); err != nil {
 		return slog.LevelInfo
 	}
+	return level
 }

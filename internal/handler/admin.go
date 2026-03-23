@@ -4,29 +4,37 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"3x-ui-sub-unifier/internal/service"
 )
 
 type AdminHandler struct {
-	subService    *service.SubscriptionService
 	clientService *service.ClientService
 	logger        *slog.Logger
+	adminSecret   string
 }
 
-func NewAdminHandler(subService *service.SubscriptionService, clientService *service.ClientService, logger *slog.Logger) *AdminHandler {
+func NewAdminHandler(clientService *service.ClientService, logger *slog.Logger, adminSecret string) *AdminHandler {
 	return &AdminHandler{
-		subService:    subService,
 		clientService: clientService,
 		logger:        logger,
+		adminSecret:   adminSecret,
 	}
 }
 
+func (h *AdminHandler) checkSecret(r *http.Request) bool {
+	return r.URL.Query().Get("secret") == h.adminSecret
+}
+
 func (h *AdminHandler) HandleGetSubURL(w http.ResponseWriter, r *http.Request) {
-	email := strings.TrimPrefix(r.URL.Path, "/admin/sub-url/")
-	if email == "" {
-		writeError(w, http.StatusBadRequest, "missing email")
+	if !h.checkSecret(r) {
+		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
+		return
+	}
+
+	name := r.PathValue("name")
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "missing name")
 		return
 	}
 
@@ -36,19 +44,13 @@ func (h *AdminHandler) HandleGetSubURL(w http.ResponseWriter, r *http.Request) {
 	}
 	host := scheme + "://" + r.Host
 
-	subURL, err := h.subService.BuildSubURL(r.Context(), host, email)
-	if err != nil {
-		h.logger.Error("failed to build sub URL", "email", email, "error", err)
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
+	subURL := service.BuildSubURL(host, name)
 	writeSuccess(w, map[string]string{"url": subURL})
 }
 
 func (h *AdminHandler) HandleCreateClient(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	if !h.checkSecret(r) {
+		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
 		return
 	}
 
@@ -58,8 +60,8 @@ func (h *AdminHandler) HandleCreateClient(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if req.Email == "" {
-		writeError(w, http.StatusBadRequest, "email is required")
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 	if len(req.InboundIDs) == 0 {
@@ -69,7 +71,7 @@ func (h *AdminHandler) HandleCreateClient(w http.ResponseWriter, r *http.Request
 
 	results, err := h.clientService.CreateClientAcrossPanels(r.Context(), req)
 	if err != nil {
-		h.logger.Error("failed to create client", "email", req.Email, "error", err)
+		h.logger.Error("failed to create client", "name", req.Name, "error", err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

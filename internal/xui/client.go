@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"3x-ui-sub-unifier/internal/config"
@@ -23,7 +24,7 @@ type APIClient struct {
 	httpClient *http.Client
 	logger     *slog.Logger
 	mu         sync.Mutex
-	loggedIn   bool
+	loggedIn   atomic.Bool
 }
 
 func NewAPIClient(panel config.PanelConfig, logger *slog.Logger) *APIClient {
@@ -41,9 +42,17 @@ func NewAPIClient(panel config.PanelConfig, logger *slog.Logger) *APIClient {
 	}
 }
 
+func (c *APIClient) PanelName() string {
+	return c.panel.Name
+}
+
 func (c *APIClient) Login(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if c.loggedIn.Load() {
+		return nil
+	}
 
 	form := url.Values{}
 	form.Set("username", c.panel.Username)
@@ -71,35 +80,24 @@ func (c *APIClient) Login(ctx context.Context) error {
 		return fmt.Errorf("login failed: %s", apiResp.Msg)
 	}
 
-	c.loggedIn = true
+	c.loggedIn.Store(true)
 	c.logger.Info("logged in to panel", "panel", c.panel.Name)
 	return nil
 }
 
-func (c *APIClient) ensureLoggedIn(ctx context.Context) error {
-	if c.loggedIn {
-		return nil
-	}
-	return c.Login(ctx)
-}
-
 func (c *APIClient) ListInbounds(ctx context.Context) ([]Inbound, error) {
-	data, err := c.doGet(ctx, "/panel/api/inbounds/list")
+	data, err := c.do(ctx, http.MethodGet, "/panel/api/inbounds/list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing inbounds: %w", err)
 	}
 
-	var apiResp APIResponse
-	if err := json.Unmarshal(data, &apiResp); err != nil {
-		return nil, fmt.Errorf("decoding inbounds response: %w", err)
-	}
-
-	if !apiResp.Success {
-		return nil, fmt.Errorf("list inbounds failed: %s", apiResp.Msg)
+	resp, err := parseAPIResponse(data)
+	if err != nil {
+		return nil, fmt.Errorf("listing inbounds: %w", err)
 	}
 
 	var inbounds []Inbound
-	if err := json.Unmarshal(apiResp.Obj, &inbounds); err != nil {
+	if err := json.Unmarshal(resp.Obj, &inbounds); err != nil {
 		return nil, fmt.Errorf("unmarshaling inbounds: %w", err)
 	}
 
@@ -118,18 +116,13 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 		Settings: string(settingsJSON),
 	}
 
-	data, err := c.doPost(ctx, "/panel/api/inbounds/addClient", addReq)
+	data, err := c.do(ctx, http.MethodPost, "/panel/api/inbounds/addClient", addReq)
 	if err != nil {
 		return fmt.Errorf("adding client: %w", err)
 	}
 
-	var apiResp APIResponse
-	if err := json.Unmarshal(data, &apiResp); err != nil {
-		return fmt.Errorf("decoding add client response: %w", err)
-	}
-
-	if !apiResp.Success {
-		return fmt.Errorf("add client failed: %s", apiResp.Msg)
+	if _, err := parseAPIResponse(data); err != nil {
+		return fmt.Errorf("adding client: %w", err)
 	}
 
 	return nil
@@ -157,112 +150,102 @@ func (c *APIClient) FetchSubscription(ctx context.Context, subId string) (string
 }
 
 func (c *APIClient) GetClientTraffic(ctx context.Context, email string) (*ClientTraffic, error) {
-	data, err := c.doGet(ctx, "/panel/api/inbounds/getClientTraffics/"+email)
+	data, err := c.do(ctx, http.MethodGet, "/panel/api/inbounds/getClientTraffics/"+email, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting client traffic: %w", err)
 	}
 
-	var apiResp APIResponse
-	if err := json.Unmarshal(data, &apiResp); err != nil {
-		return nil, fmt.Errorf("decoding traffic response: %w", err)
-	}
-
-	if !apiResp.Success {
-		return nil, fmt.Errorf("get client traffic failed: %s", apiResp.Msg)
+	resp, err := parseAPIResponse(data)
+	if err != nil {
+		return nil, fmt.Errorf("getting client traffic: %w", err)
 	}
 
 	var traffic ClientTraffic
-	if err := json.Unmarshal(apiResp.Obj, &traffic); err != nil {
+	if err := json.Unmarshal(resp.Obj, &traffic); err != nil {
 		return nil, fmt.Errorf("unmarshaling client traffic: %w", err)
 	}
 
 	return &traffic, nil
 }
 
-func (c *APIClient) PanelName() string {
-	return c.panel.Name
-}
-
-func (c *APIClient) doGet(ctx context.Context, path string) ([]byte, error) {
+// do executes an authenticated API request with automatic re-login on 401.
+func (c *APIClient) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	if err := c.ensureLoggedIn(ctx); err != nil {
 		return nil, err
 	}
 
-	reqURL := c.panel.Address + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating GET request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("executing GET request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		c.loggedIn = false
-		if err := c.ensureLoggedIn(ctx); err != nil {
-			return nil, err
-		}
-
-		req, err = http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	var jsonBody []byte
+	if body != nil {
+		var err error
+		jsonBody, err = json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("creating retry GET request: %w", err)
+			return nil, fmt.Errorf("marshaling request body: %w", err)
 		}
-
-		resp, err = c.httpClient.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("executing retry GET request: %w", err)
-		}
-		defer resp.Body.Close()
 	}
 
-	return io.ReadAll(resp.Body)
-}
-
-func (c *APIClient) doPost(ctx context.Context, path string, body any) ([]byte, error) {
-	if err := c.ensureLoggedIn(ctx); err != nil {
+	data, statusCode, err := c.executeRequest(ctx, method, path, jsonBody)
+	if err != nil {
 		return nil, err
 	}
 
-	reqURL := c.panel.Address + path
-
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling request body: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(jsonBody))
-	if err != nil {
-		return nil, fmt.Errorf("creating POST request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("executing POST request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		c.loggedIn = false
+	if statusCode == http.StatusUnauthorized {
+		c.loggedIn.Store(false)
 		if err := c.ensureLoggedIn(ctx); err != nil {
 			return nil, err
 		}
-
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(jsonBody))
+		data, _, err = c.executeRequest(ctx, method, path, jsonBody)
 		if err != nil {
-			return nil, fmt.Errorf("creating retry POST request: %w", err)
+			return nil, err
 		}
+	}
+
+	return data, nil
+}
+
+func (c *APIClient) ensureLoggedIn(ctx context.Context) error {
+	if c.loggedIn.Load() {
+		return nil
+	}
+	return c.Login(ctx)
+}
+
+func (c *APIClient) executeRequest(ctx context.Context, method, path string, jsonBody []byte) ([]byte, int, error) {
+	reqURL := c.panel.Address + path
+
+	var bodyReader io.Reader
+	if jsonBody != nil {
+		bodyReader = bytes.NewReader(jsonBody)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("creating %s request: %w", method, err)
+	}
+	if jsonBody != nil {
 		req.Header.Set("Content-Type", "application/json")
-
-		resp, err = c.httpClient.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("executing retry POST request: %w", err)
-		}
-		defer resp.Body.Close()
 	}
 
-	return io.ReadAll(resp.Body)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("executing %s request: %w", method, err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("reading response body: %w", err)
+	}
+
+	return data, resp.StatusCode, nil
+}
+
+func parseAPIResponse(data []byte) (APIResponse, error) {
+	var resp APIResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return resp, fmt.Errorf("decoding API response: %w", err)
+	}
+	if !resp.Success {
+		return resp, fmt.Errorf("API error: %s", resp.Msg)
+	}
+	return resp, nil
 }
