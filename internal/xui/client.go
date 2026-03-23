@@ -128,25 +128,25 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 	return nil
 }
 
-func (c *APIClient) FetchSubscription(ctx context.Context, subId string) (string, error) {
+func (c *APIClient) FetchSubscription(ctx context.Context, subId string) ([]byte, error) {
 	reqURL := c.panel.Address + c.panel.SubPath + "/" + subId
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("creating subscription request: %w", err)
+		return nil, fmt.Errorf("creating subscription request: %w", err)
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("fetching subscription: %w", err)
+		return nil, fmt.Errorf("fetching subscription: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("reading subscription body: %w", err)
+		return nil, fmt.Errorf("reading subscription body: %w", err)
 	}
 
-	return string(body), nil
+	return body, nil
 }
 
 func (c *APIClient) GetClientTraffic(ctx context.Context, email string) (*ClientTraffic, error) {

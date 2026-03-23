@@ -12,7 +12,7 @@ This downloads the latest release binary for your platform, installs it to `/usr
 
 ## Features
 
-- **Subscription merging** — fetches configs from all configured panels concurrently, merges and returns as a single base64 subscription
+- **Subscription merging** — fetches JSON subscription configs from all configured panels concurrently, merges outbounds and returns as a unified JSON array
 - **Admin API** — list inbounds, create clients across all panels at once, look up unified subscription URL by user name
 - **Protocol-aware** — automatically adapts credentials for vmess, vless, trojan, and shadowsocks inbounds
 - **Pure Go** — built with `net/http`, no external frameworks
@@ -28,7 +28,7 @@ This downloads the latest release binary for your platform, installs it to `/usr
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/sub/{subId}` | None | Merged subscription from all panels |
+| `GET` | `/sub/{subId}` | None | Merged JSON outbounds from all panels |
 | `GET` | `/admin/inbounds` | `?secret=` | List all inbounds from all panels |
 | `GET` | `/admin/sub-url/{name}` | `?secret=` | Get unified subscription URL by user name |
 | `POST` | `/admin/clients` | `?secret=` | Create client across all panels |
@@ -75,6 +75,10 @@ GET /admin/sub-url/therealmal-mac?secret=your-secret
 ```
 
 Returns the unified subscription URL that aggregates configs for this user from all panels.
+
+## Important: Subscription Path
+
+The `sub_path` in the config must be set to the **JSON Subscription Path** from your 3X-UI panel settings (Panel Settings → Subscription → Json Subscription Path), **not** the regular Sub URI Path. The default is `/json`. The service fetches JSON subscription configs from each panel and merges all outbounds into a single JSON array.
 
 ## Setup
 
@@ -129,12 +133,12 @@ Returns the unified subscription URL that aggregates configs for this user from 
          address: "https://panel1.example.com:2053/admin" # that should contain root panel path without last '/'
          username: "admin"
          password: "admin"
-         sub_path: "/sub"
+         sub_path: "/json"  # JSON Sub URI Path from 3X-UI panel settings
       - name: "server-2"
          address: "https://panel2.example.com:2053/another-admin"
          username: "admin"
          password: "admin"
-         sub_path: "/sub"
+         sub_path: "/json"  # JSON Sub URI Path from 3X-UI panel settings
 
    log:
       level: "info"

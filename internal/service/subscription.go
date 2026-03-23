@@ -3,11 +3,10 @@ package service
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"subs-aggregator/internal/xui"
@@ -38,12 +37,17 @@ func BuildSubURL(host, name string) string {
 
 type subscriptionResult struct {
 	panel string
-	data  string
+	data  []byte
 	err   error
 }
 
-// MergeSubscriptions fetches subscriptions from all panels concurrently and merges the results.
-func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId string) (string, error) {
+// xrayConfig is used to extract outbounds from a 3X-UI JSON subscription response.
+type xrayConfig struct {
+	Outbounds []json.RawMessage `json:"outbounds"`
+}
+
+// MergeSubscriptions fetches JSON subscriptions from all panels concurrently and merges the outbounds.
+func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId string) ([]byte, error) {
 	results := make([]subscriptionResult, len(s.clients))
 	var wg sync.WaitGroup
 
@@ -62,7 +66,7 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 
 	wg.Wait()
 
-	var allLines []string
+	var allOutbounds []json.RawMessage
 	successCount := 0
 	failCount := 0
 
@@ -76,42 +80,29 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 			continue
 		}
 
-		trimmed := strings.TrimSpace(res.data)
-		decoded, err := base64.StdEncoding.DecodeString(trimmed)
-		if err != nil {
-			decoded, err = base64.RawStdEncoding.DecodeString(trimmed)
-			if err != nil {
-				s.logger.Warn("failed to decode subscription data",
-					"panel", res.panel,
-					"error", err,
-				)
-				failCount++
-				continue
-			}
+		var cfg xrayConfig
+		if err := json.Unmarshal(res.data, &cfg); err != nil {
+			s.logger.Warn("failed to parse JSON subscription",
+				"panel", res.panel,
+				"error", err,
+			)
+			failCount++
+			continue
 		}
 
-		lines := strings.Split(string(decoded), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				allLines = append(allLines, line)
-			}
-		}
+		allOutbounds = append(allOutbounds, cfg.Outbounds...)
 		successCount++
 	}
 
 	if successCount == 0 {
-		return "", fmt.Errorf("failed to fetch subscription from all panels")
+		return nil, fmt.Errorf("failed to fetch subscription from all panels")
 	}
 
 	s.logger.Info("merged subscriptions",
 		"successPanels", successCount,
 		"failedPanels", failCount,
-		"totalLines", len(allLines),
+		"totalOutbounds", len(allOutbounds),
 	)
 
-	merged := strings.Join(allLines, "\n")
-	encoded := base64.StdEncoding.EncodeToString([]byte(merged))
-	return encoded, nil
+	return json.Marshal(allOutbounds)
 }
-

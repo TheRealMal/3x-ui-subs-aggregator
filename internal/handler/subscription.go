@@ -33,6 +33,6 @@ func (h *SubscriptionHandler) HandleSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(merged))
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(merged)
 }

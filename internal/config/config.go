@@ -11,7 +11,7 @@ import (
 
 const (
 	DefaultPort     = 8080
-	DefaultSubPath  = "/sub"
+	DefaultSubPath  = "/json"
 	DefaultLogLevel = "info"
 
 	certBaseDir   = "/root/cert"
