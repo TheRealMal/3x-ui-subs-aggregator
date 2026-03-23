@@ -79,7 +79,7 @@ func cmdRun(cfgPath string) {
 	subService := service.NewSubscriptionService(xuiClients, logger)
 	clientService := service.NewClientService(xuiClients, logger)
 
-	subHandler := handler.NewSubscriptionHandler(subService, logger)
+	subHandler := handler.NewSubscriptionHandler(subService, logger, cfg.Server.ProfileTitle)
 	adminHandler := handler.NewAdminHandler(clientService, logger, cfg.Server.AdminSecret)
 
 	mux := http.NewServeMux()

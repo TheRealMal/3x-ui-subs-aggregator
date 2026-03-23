@@ -15,7 +15,7 @@ const (
 	DefaultAPIPort  = 2053
 	DefaultSubPort  = 2053
 	DefaultBasePath = "/panel/"
-	DefaultSubPath  = "/json/"
+	DefaultSubPath  = "/sub/"
 	DefaultLogLevel = "info"
 
 	certBaseDir   = "/root/cert"
@@ -36,9 +36,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port        int       `yaml:"port"`
-	AdminSecret string    `yaml:"admin_secret"`
-	TLS         TLSConfig `yaml:"tls"`
+	Port         int       `yaml:"port"`
+	AdminSecret  string    `yaml:"admin_secret"`
+	ProfileTitle string    `yaml:"profile_title"`
+	TLS          TLSConfig `yaml:"tls"`
 }
 
 type TLSConfig struct {

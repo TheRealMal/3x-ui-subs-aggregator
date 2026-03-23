@@ -3,6 +3,7 @@
 server:
   port: 8080
   admin_secret: "change-me-to-a-strong-secret"
+  profile_title: "My VPN" # Subscription profile name shown in HApp/Shadowrocket
   tls:
     # Optional: domain name for auto-discovering certs in /root/cert/<domain>/
     domain: ""
@@ -19,9 +20,9 @@ panels:
     username: "admin"
     password: "admin"
     api_port: 2053       # Port for panel API (login, inbounds, client management)
-    sub_port: 443        # Port for JSON subscription endpoint
+    sub_port: 443        # Port for subscription endpoint
     base_path: "/panel/" # Panel base path (starts and ends with /), used for API calls
-    sub_path: "/json/"   # JSON Sub URI Path from 3X-UI panel settings (starts and ends with /)
+    sub_path: "/sub/"    # Sub URI Path from 3X-UI panel settings (starts and ends with /)
   - name: "server-2"
     address: "https://panel2.example.com"
     username: "admin"
@@ -29,7 +30,7 @@ panels:
     api_port: 2053
     sub_port: 443
     base_path: "/another-admin/"
-    sub_path: "/json/"
+    sub_path: "/sub/"
 
 log:
   level: "info"

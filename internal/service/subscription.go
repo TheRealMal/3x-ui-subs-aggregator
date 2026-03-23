@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"subs-aggregator/internal/xui"
@@ -41,41 +42,8 @@ type subscriptionResult struct {
 	err   error
 }
 
-// xrayConfig is used to extract outbounds from a 3X-UI JSON subscription response.
-type xrayConfig struct {
-	Outbounds []json.RawMessage `json:"outbounds"`
-}
-
-// parseOutbounds extracts outbounds from a panel response that is either
-// {"outbounds": [...]} or a raw JSON array [...].
-func parseOutbounds(data []byte) ([]json.RawMessage, error) {
-	var cfg xrayConfig
-	if err := json.Unmarshal(data, &cfg); err == nil && len(cfg.Outbounds) > 0 {
-		return cfg.Outbounds, nil
-	}
-
-	var arr []json.RawMessage
-	if err := json.Unmarshal(data, &arr); err != nil {
-		return nil, fmt.Errorf("expected JSON object with outbounds or JSON array: %w", err)
-	}
-
-	// Array of full xray configs — extract outbounds from each element.
-	var outbounds []json.RawMessage
-	for _, item := range arr {
-		var nested xrayConfig
-		if err := json.Unmarshal(item, &nested); err == nil && len(nested.Outbounds) > 0 {
-			outbounds = append(outbounds, nested.Outbounds...)
-		}
-	}
-	if len(outbounds) > 0 {
-		return outbounds, nil
-	}
-
-	// Plain array of outbound objects.
-	return arr, nil
-}
-
-// MergeSubscriptions fetches JSON subscriptions from all panels concurrently and merges the outbounds.
+// MergeSubscriptions fetches base64-encoded URI subscriptions from all panels
+// concurrently, decodes them, merges the URI lines, and re-encodes as base64.
 func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId string) ([]byte, error) {
 	results := make([]subscriptionResult, len(s.clients))
 	var wg sync.WaitGroup
@@ -95,7 +63,7 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 
 	wg.Wait()
 
-	var allOutbounds []json.RawMessage
+	var allURIs []string
 	successCount := 0
 	failCount := 0
 
@@ -109,9 +77,9 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 			continue
 		}
 
-		outbounds, err := parseOutbounds(res.data)
+		decoded, err := decodeBase64(string(res.data))
 		if err != nil {
-			s.logger.Warn("failed to parse JSON subscription",
+			s.logger.Warn("failed to decode base64 subscription",
 				"panel", res.panel,
 				"error", err,
 			)
@@ -119,7 +87,12 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 			continue
 		}
 
-		allOutbounds = append(allOutbounds, outbounds...)
+		for _, line := range strings.Split(decoded, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				allURIs = append(allURIs, line)
+			}
+		}
 		successCount++
 	}
 
@@ -130,8 +103,23 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 	s.logger.Info("merged subscriptions",
 		"successPanels", successCount,
 		"failedPanels", failCount,
-		"totalOutbounds", len(allOutbounds),
+		"totalURIs", len(allURIs),
 	)
 
-	return json.Marshal(xrayConfig{Outbounds: allOutbounds})
+	merged := strings.Join(allURIs, "\n")
+	encoded := base64.StdEncoding.EncodeToString([]byte(merged))
+	return []byte(encoded), nil
+}
+
+// decodeBase64 decodes a base64 string, handling both padded and unpadded input.
+func decodeBase64(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	decoded, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(strings.TrimRight(s, "="))
+		if err != nil {
+			return "", fmt.Errorf("invalid base64: %w", err)
+		}
+	}
+	return string(decoded), nil
 }

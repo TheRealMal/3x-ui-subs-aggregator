@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"log/slog"
 	"net/http"
 
@@ -8,14 +9,16 @@ import (
 )
 
 type SubscriptionHandler struct {
-	subService *service.SubscriptionService
-	logger     *slog.Logger
+	subService   *service.SubscriptionService
+	logger       *slog.Logger
+	profileTitle string
 }
 
-func NewSubscriptionHandler(subService *service.SubscriptionService, logger *slog.Logger) *SubscriptionHandler {
+func NewSubscriptionHandler(subService *service.SubscriptionService, logger *slog.Logger, profileTitle string) *SubscriptionHandler {
 	return &SubscriptionHandler{
-		subService: subService,
-		logger:     logger,
+		subService:   subService,
+		logger:       logger,
+		profileTitle: profileTitle,
 	}
 }
 
@@ -33,6 +36,10 @@ func (h *SubscriptionHandler) HandleSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if h.profileTitle != "" {
+		encoded := base64.StdEncoding.EncodeToString([]byte(h.profileTitle))
+		w.Header().Set("profile-title", "base64:"+encoded)
+	}
 	w.Write(merged)
 }

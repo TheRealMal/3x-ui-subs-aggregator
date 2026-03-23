@@ -12,7 +12,7 @@ This downloads the latest release binary for your platform, installs it to `/usr
 
 ## Features
 
-- **Subscription merging** — fetches JSON subscription configs from all configured panels concurrently, merges outbounds and returns as a unified JSON array
+- **Subscription merging** — fetches base64-encoded URI subscriptions from all configured panels concurrently, merges proxy URIs and returns a unified base64 subscription compatible with HApp (Hiddify) and Shadowrocket
 - **Admin API** — list inbounds, create clients across all panels at once, look up unified subscription URL by user name
 - **Protocol-aware** — automatically adapts credentials for vmess, vless, trojan, and shadowsocks inbounds
 - **Pure Go** — built with `net/http`, no external frameworks
@@ -28,7 +28,7 @@ This downloads the latest release binary for your platform, installs it to `/usr
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/sub/{subId}` | None | Merged JSON outbounds from all panels |
+| `GET` | `/sub/{subId}` | None | Merged base64 URI subscription from all panels |
 | `GET` | `/admin/inbounds` | `?secret=` | List all inbounds from all panels |
 | `GET` | `/admin/sub-url/{name}` | `?secret=` | Get unified subscription URL by user name |
 | `POST` | `/admin/clients` | `?secret=` | Create client across all panels |
@@ -81,14 +81,21 @@ Returns the unified subscription URL that aggregates configs for this user from 
 Each panel in the config requires two paths (both must start and end with `/`):
 
 - **`base_path`** — the panel base path used for API calls (login, inbounds, client management). This is the Panel URI Root Path from your 3X-UI settings. Default: `/panel/`
-- **`sub_path`** — the **JSON Subscription Path** from your 3X-UI panel settings (Panel Settings → Subscription → Json Subscription Path), **not** the regular Sub URI Path. Default: `/json/`
+- **`sub_path`** — the **Sub URI Path** from your 3X-UI panel settings (Panel Settings → Subscription → Sub URI Path). Default: `/sub/`
 
 Each panel also has separate ports for the API and subscription endpoints:
 
 - **`api_port`** — port for panel API calls. Default: `2053`
-- **`sub_port`** — port for JSON subscription endpoint. Default: `2053`
+- **`sub_port`** — port for subscription endpoint. Default: `2053`
 
 The `address` field should contain only the scheme and host (e.g., `https://panel.example.com`), without any port or path.
+
+## Subscription Output
+
+The `/sub/{subId}` endpoint returns a **base64-encoded** list of proxy URIs (one per line), compatible with HApp (Hiddify) and Shadowrocket. Response headers include:
+
+- `Content-Type: text/plain; charset=utf-8`
+- `profile-title: base64:<encoded title>` — configurable via `server.profile_title` in the config
 
 ## Setup
 
@@ -128,6 +135,7 @@ The `address` field should contain only the scheme and host (e.g., `https://pane
    server:
       port: 8080
       admin_secret: "change-me-to-a-strong-secret"
+      profile_title: "My VPN" # Subscription profile name shown in HApp/Shadowrocket
       tls:
          # Optional: domain name for auto-discovering certs in /root/cert/<domain>/
          domain: ""
@@ -144,9 +152,9 @@ The `address` field should contain only the scheme and host (e.g., `https://pane
          username: "admin"
          password: "admin"
          api_port: 2053       # Port for panel API
-         sub_port: 443        # Port for JSON subscription endpoint
+         sub_port: 443        # Port for subscription endpoint
          base_path: "/panel/" # Panel base path for API calls (starts and ends with /)
-         sub_path: "/json/"   # JSON Sub URI Path from 3X-UI panel settings (starts and ends with /)
+         sub_path: "/sub/"    # Sub URI Path from 3X-UI panel settings (starts and ends with /)
       - name: "server-2"
          address: "https://panel2.example.com"
          username: "admin"
@@ -154,7 +162,7 @@ The `address` field should contain only the scheme and host (e.g., `https://pane
          api_port: 2053
          sub_port: 443
          base_path: "/another-admin/"
-         sub_path: "/json/"
+         sub_path: "/sub/"
 
    log:
       level: "info"
