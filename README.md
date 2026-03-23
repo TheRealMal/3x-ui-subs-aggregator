@@ -112,32 +112,32 @@ Returns the unified subscription URL that aggregates configs for this user from 
 3. Fill in your panel details in `configs/config.yaml`:
    ```yaml
    server:
-   port: 8080
-   admin_secret: "change-me-to-a-strong-secret"
-   tls:
-      # Optional: domain name for auto-discovering certs in /root/cert/<domain>/
-      domain: ""
-      # Optional: explicit paths override auto-discovery. Both must be set together.
-      cert_file: ""
-      key_file: ""
-      # Auto-discovery order (when no explicit paths):
-      #   1. /root/cert/<domain>/{fullchain.pem,privkey.pem|cert.pem,key.pem|fullchain.cer,privkey.key}
-      #   2. /root/cert/ip/<ip>/{same patterns}
+      port: 8080
+      admin_secret: "change-me-to-a-strong-secret"
+      tls:
+         # Optional: domain name for auto-discovering certs in /root/cert/<domain>/
+         domain: ""
+         # Optional: explicit paths override auto-discovery. Both must be set together.
+         cert_file: ""
+         key_file: ""
+         # Auto-discovery order (when no explicit paths):
+         #   1. /root/cert/<domain>/{fullchain.pem,privkey.pem|cert.pem,key.pem|fullchain.cer,privkey.key}
+         #   2. /root/cert/ip/<ip>/{same patterns}
 
    panels:
-   - name: "server-1"
-      address: "https://panel1.example.com:2053/admin" # that should contain root panel path without last '/'
-      username: "admin"
-      password: "admin"
-      sub_path: "/sub"
-   - name: "server-2"
-      address: "https://panel2.example.com:2053/another-admin"
-      username: "admin"
-      password: "admin"
-      sub_path: "/sub"
+      - name: "server-1"
+         address: "https://panel1.example.com:2053/admin" # that should contain root panel path without last '/'
+         username: "admin"
+         password: "admin"
+         sub_path: "/sub"
+      - name: "server-2"
+         address: "https://panel2.example.com:2053/another-admin"
+         username: "admin"
+         password: "admin"
+         sub_path: "/sub"
 
    log:
-   level: "info"
+      level: "info"
    ```
 
    At least 2 panels are required.
