@@ -76,9 +76,14 @@ GET /admin/sub-url/therealmal-mac?secret=your-secret
 
 Returns the unified subscription URL that aggregates configs for this user from all panels.
 
-## Important: Subscription Path
+## Important: Panel Paths
 
-The `sub_path` in the config must be set to the **JSON Subscription Path** from your 3X-UI panel settings (Panel Settings → Subscription → Json Subscription Path), **not** the regular Sub URI Path. The default is `/json`. The service fetches JSON subscription configs from each panel and merges all outbounds into a single JSON array.
+Each panel in the config requires two paths (both must start and end with `/`):
+
+- **`base_path`** — the panel base path used for API calls (login, inbounds, client management). This is the Panel URI Root Path from your 3X-UI settings. Default: `/panel/`
+- **`sub_path`** — the **JSON Subscription Path** from your 3X-UI panel settings (Panel Settings → Subscription → Json Subscription Path), **not** the regular Sub URI Path. Default: `/json/`
+
+The `address` field should contain only the host and port (e.g., `https://panel.example.com:2053`), without any path.
 
 ## Setup
 
@@ -130,15 +135,17 @@ The `sub_path` in the config must be set to the **JSON Subscription Path** from 
 
    panels:
       - name: "server-1"
-         address: "https://panel1.example.com:2053/admin" # that should contain root panel path without last '/'
+         address: "https://panel1.example.com:2053"  # host and port only
          username: "admin"
          password: "admin"
-         sub_path: "/json"  # JSON Sub URI Path from 3X-UI panel settings
+         base_path: "/panel/"  # Panel base path for API calls (starts and ends with /)
+         sub_path: "/json/"    # JSON Sub URI Path from 3X-UI panel settings (starts and ends with /)
       - name: "server-2"
-         address: "https://panel2.example.com:2053/another-admin"
+         address: "https://panel2.example.com:2053"
          username: "admin"
          password: "admin"
-         sub_path: "/json"  # JSON Sub URI Path from 3X-UI panel settings
+         base_path: "/another-admin/"
+         sub_path: "/json/"
 
    log:
       level: "info"

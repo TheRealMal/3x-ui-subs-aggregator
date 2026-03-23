@@ -58,7 +58,7 @@ func (c *APIClient) Login(ctx context.Context) error {
 	form.Set("username", c.panel.Username)
 	form.Set("password", c.panel.Password)
 
-	reqURL := c.panel.Address + "/login"
+	reqURL := c.panel.Address + c.panel.BasePath + "login"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return fmt.Errorf("creating login request: %w", err)
@@ -86,7 +86,7 @@ func (c *APIClient) Login(ctx context.Context) error {
 }
 
 func (c *APIClient) ListInbounds(ctx context.Context) ([]Inbound, error) {
-	data, err := c.do(ctx, http.MethodGet, "/panel/api/inbounds/list", nil)
+	data, err := c.do(ctx, http.MethodGet, "api/inbounds/list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing inbounds: %w", err)
 	}
@@ -116,7 +116,7 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 		Settings: string(settingsJSON),
 	}
 
-	data, err := c.do(ctx, http.MethodPost, "/panel/api/inbounds/addClient", addReq)
+	data, err := c.do(ctx, http.MethodPost, "api/inbounds/addClient", addReq)
 	if err != nil {
 		return fmt.Errorf("adding client: %w", err)
 	}
@@ -129,7 +129,7 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 }
 
 func (c *APIClient) FetchSubscription(ctx context.Context, subId string) ([]byte, error) {
-	reqURL := c.panel.Address + c.panel.SubPath + "/" + subId
+	reqURL := c.panel.Address + c.panel.SubPath + subId
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating subscription request: %w", err)
@@ -150,7 +150,7 @@ func (c *APIClient) FetchSubscription(ctx context.Context, subId string) ([]byte
 }
 
 func (c *APIClient) GetClientTraffic(ctx context.Context, email string) (*ClientTraffic, error) {
-	data, err := c.do(ctx, http.MethodGet, "/panel/api/inbounds/getClientTraffics/"+email, nil)
+	data, err := c.do(ctx, http.MethodGet, "api/inbounds/getClientTraffics/"+email, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting client traffic: %w", err)
 	}
@@ -210,7 +210,7 @@ func (c *APIClient) ensureLoggedIn(ctx context.Context) error {
 }
 
 func (c *APIClient) executeRequest(ctx context.Context, method, path string, jsonBody []byte) ([]byte, int, error) {
-	reqURL := c.panel.Address + path
+	reqURL := c.panel.Address + c.panel.BasePath + path
 
 	var bodyReader io.Reader
 	if jsonBody != nil {

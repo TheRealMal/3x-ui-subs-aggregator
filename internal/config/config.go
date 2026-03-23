@@ -5,13 +5,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 const (
 	DefaultPort     = 8080
-	DefaultSubPath  = "/json"
+	DefaultBasePath = "/panel/"
+	DefaultSubPath  = "/json/"
 	DefaultLogLevel = "info"
 
 	certBaseDir   = "/root/cert"
@@ -48,6 +50,7 @@ type PanelConfig struct {
 	Address  string `yaml:"address"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+	BasePath string `yaml:"base_path"`
 	SubPath  string `yaml:"sub_path"`
 }
 
@@ -83,9 +86,15 @@ func (c *Config) setDefaults() {
 		c.Log.Level = DefaultLogLevel
 	}
 	for i := range c.Panels {
+		c.Panels[i].Address = strings.TrimRight(c.Panels[i].Address, "/")
+		if c.Panels[i].BasePath == "" {
+			c.Panels[i].BasePath = DefaultBasePath
+		}
 		if c.Panels[i].SubPath == "" {
 			c.Panels[i].SubPath = DefaultSubPath
 		}
+		c.Panels[i].BasePath = normalizePath(c.Panels[i].BasePath)
+		c.Panels[i].SubPath = normalizePath(c.Panels[i].SubPath)
 	}
 }
 
@@ -181,4 +190,15 @@ func findCertPairInDir(dir string) (certFile, keyFile string, found bool) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// normalizePath ensures a path starts with / and ends with /.
+func normalizePath(p string) string {
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	if !strings.HasSuffix(p, "/") {
+		p = p + "/"
+	}
+	return p
 }
