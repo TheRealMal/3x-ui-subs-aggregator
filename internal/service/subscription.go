@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -32,8 +33,13 @@ func HashName(name string) string {
 }
 
 // BuildSubURL computes the subscription URL for the given client name.
-func BuildSubURL(host, name string) string {
-	return fmt.Sprintf("%s/sub/%s", host, HashName(name))
+// If profileTitle is non-empty, it is appended as a fragment for Shadowrocket compatibility.
+func BuildSubURL(host, name, profileTitle string) string {
+	subURL := fmt.Sprintf("%s/sub/%s", host, HashName(name))
+	if profileTitle != "" {
+		subURL += "#" + url.PathEscape(profileTitle)
+	}
+	return subURL
 }
 
 type subscriptionResult struct {

@@ -12,13 +12,15 @@ type AdminHandler struct {
 	clientService *service.ClientService
 	logger        *slog.Logger
 	adminSecret   string
+	profileTitle  string
 }
 
-func NewAdminHandler(clientService *service.ClientService, logger *slog.Logger, adminSecret string) *AdminHandler {
+func NewAdminHandler(clientService *service.ClientService, logger *slog.Logger, adminSecret, profileTitle string) *AdminHandler {
 	return &AdminHandler{
 		clientService: clientService,
 		logger:        logger,
 		adminSecret:   adminSecret,
+		profileTitle:  profileTitle,
 	}
 }
 
@@ -44,7 +46,7 @@ func (h *AdminHandler) HandleGetSubURL(w http.ResponseWriter, r *http.Request) {
 	}
 	host := scheme + "://" + r.Host
 
-	subURL := service.BuildSubURL(host, name)
+	subURL := service.BuildSubURL(host, name, h.profileTitle)
 	writeSuccess(w, map[string]string{"url": subURL})
 }
 
