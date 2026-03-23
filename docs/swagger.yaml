@@ -1,0 +1,218 @@
+basePath: /
+definitions:
+  handler.Response:
+    properties:
+      msg:
+        type: string
+      obj: {}
+      success:
+        type: boolean
+    type: object
+  handler.SubURLResponse:
+    properties:
+      url:
+        type: string
+    type: object
+  service.CreateClientRequest:
+    properties:
+      expiryTime:
+        type: integer
+      inbounds:
+        items:
+          type: string
+        type: array
+      limitIp:
+        type: integer
+      name:
+        type: string
+      totalGB:
+        type: integer
+    type: object
+  service.CreateClientResult:
+    properties:
+      email:
+        type: string
+      error:
+        type: string
+      inbound:
+        type: string
+      panel:
+        type: string
+      success:
+        type: boolean
+    type: object
+  service.PanelInbound:
+    properties:
+      enable:
+        type: boolean
+      id:
+        type: integer
+      port:
+        type: integer
+      protocol:
+        type: string
+      remark:
+        type: string
+    type: object
+  service.PanelInboundsResult:
+    properties:
+      error:
+        type: string
+      inbounds:
+        items:
+          $ref: '#/definitions/service.PanelInbound'
+        type: array
+      panel:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Aggregates subscriptions from multiple 3X-UI panels and provides admin
+    APIs for client management.
+  title: 3X-UI Subscription Aggregator API
+  version: "1.0"
+paths:
+  /admin/clients:
+    post:
+      consumes:
+      - application/json
+      description: Creates a client with the same credentials across all panels and
+        requested inbounds
+      parameters:
+      - description: Client creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.CreateClientRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.Response'
+            - properties:
+                obj:
+                  items:
+                    $ref: '#/definitions/service.CreateClientResult'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      security:
+      - AdminSecret: []
+      summary: Create client across panels
+      tags:
+      - admin
+  /admin/inbounds:
+    get:
+      description: Returns all inbounds from all configured 3X-UI panels
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.Response'
+            - properties:
+                obj:
+                  items:
+                    $ref: '#/definitions/service.PanelInboundsResult'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      security:
+      - AdminSecret: []
+      summary: List all inbounds
+      tags:
+      - admin
+  /admin/sub-url/{name}:
+    get:
+      description: Generates a subscription URL for the given client name
+      parameters:
+      - description: Client name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.Response'
+            - properties:
+                obj:
+                  $ref: '#/definitions/handler.SubURLResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+      security:
+      - AdminSecret: []
+      summary: Get subscription URL for client
+      tags:
+      - admin
+  /sub/{subId}:
+    get:
+      description: Fetches and merges subscriptions from all panels for the given
+        subscription ID
+      parameters:
+      - description: Subscription ID (SHA256 hash of client name)
+        in: path
+        name: subId
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Base64-encoded merged subscription data
+          schema:
+            type: string
+        "400":
+          description: Missing subscription ID
+          schema:
+            type: string
+        "404":
+          description: Subscription not found
+          schema:
+            type: string
+      summary: Get merged subscription
+      tags:
+      - subscription
+securityDefinitions:
+  AdminSecret:
+    description: Admin secret from config (admin_secret value)
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

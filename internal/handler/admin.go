@@ -25,9 +25,21 @@ func NewAdminHandler(clientService *service.ClientService, logger *slog.Logger, 
 }
 
 func (h *AdminHandler) checkSecret(r *http.Request) bool {
-	return r.URL.Query().Get("secret") == h.adminSecret
+	return r.Header.Get("Authorization") == h.adminSecret
 }
 
+// HandleGetSubURL godoc
+//
+//	@Summary		Get subscription URL for client
+//	@Description	Generates a subscription URL for the given client name
+//	@Tags			admin
+//	@Produce		json
+//	@Param			name	path		string	true	"Client name"
+//	@Success		200		{object}	Response{obj=SubURLResponse}
+//	@Failure		400		{object}	Response
+//	@Failure		401		{object}	Response
+//	@Security		AdminSecret
+//	@Router			/admin/sub-url/{name} [get]
 func (h *AdminHandler) HandleGetSubURL(w http.ResponseWriter, r *http.Request) {
 	if !h.checkSecret(r) {
 		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
@@ -50,6 +62,17 @@ func (h *AdminHandler) HandleGetSubURL(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, map[string]string{"url": subURL})
 }
 
+// HandleListInbounds godoc
+//
+//	@Summary		List all inbounds
+//	@Description	Returns all inbounds from all configured 3X-UI panels
+//	@Tags			admin
+//	@Produce		json
+//	@Success		200		{object}	Response{obj=[]service.PanelInboundsResult}
+//	@Failure		401		{object}	Response
+//	@Failure		500		{object}	Response
+//	@Security		AdminSecret
+//	@Router			/admin/inbounds [get]
 func (h *AdminHandler) HandleListInbounds(w http.ResponseWriter, r *http.Request) {
 	if !h.checkSecret(r) {
 		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
@@ -66,6 +89,20 @@ func (h *AdminHandler) HandleListInbounds(w http.ResponseWriter, r *http.Request
 	writeSuccess(w, results)
 }
 
+// HandleCreateClient godoc
+//
+//	@Summary		Create client across panels
+//	@Description	Creates a client with the same credentials across all panels and requested inbounds
+//	@Tags			admin
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		service.CreateClientRequest	true	"Client creation request"
+//	@Success		200		{object}	Response{obj=[]service.CreateClientResult}
+//	@Failure		400		{object}	Response
+//	@Failure		401		{object}	Response
+//	@Failure		500		{object}	Response
+//	@Security		AdminSecret
+//	@Router			/admin/clients [post]
 func (h *AdminHandler) HandleCreateClient(w http.ResponseWriter, r *http.Request) {
 	if !h.checkSecret(r) {
 		writeError(w, http.StatusUnauthorized, "invalid or missing secret")

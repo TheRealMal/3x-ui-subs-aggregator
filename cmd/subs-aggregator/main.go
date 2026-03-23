@@ -88,6 +88,16 @@ func init() {
 	rootCmd.AddCommand(runCmd, startCmd, stopCmd, restartCmd, statusCmd, configCmd, versionCmd, updateCmd)
 }
 
+//	@title			3X-UI Subscription Aggregator API
+//	@version		1.0
+//	@description	Aggregates subscriptions from multiple 3X-UI panels and provides admin APIs for client management.
+//	@host			localhost:8080
+//	@BasePath		/
+//
+//	@securityDefinitions.apikey	AdminSecret
+//	@in							header
+//	@name						Authorization
+//	@description				Admin secret from config (admin_secret value)
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

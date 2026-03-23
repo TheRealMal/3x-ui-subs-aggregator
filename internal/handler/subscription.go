@@ -22,6 +22,17 @@ func NewSubscriptionHandler(subService *service.SubscriptionService, logger *slo
 	}
 }
 
+// HandleSubscription godoc
+//
+//	@Summary		Get merged subscription
+//	@Description	Fetches and merges subscriptions from all panels for the given subscription ID
+//	@Tags			subscription
+//	@Produce		plain
+//	@Param			subId	path		string	true	"Subscription ID (SHA256 hash of client name)"
+//	@Success		200		{string}	string	"Base64-encoded merged subscription data"
+//	@Failure		400		{string}	string	"Missing subscription ID"
+//	@Failure		404		{string}	string	"Subscription not found"
+//	@Router			/sub/{subId} [get]
 func (h *SubscriptionHandler) HandleSubscription(w http.ResponseWriter, r *http.Request) {
 	subId := r.PathValue("subId")
 	if subId == "" {

@@ -1,5 +1,10 @@
 # 3X-UI Subs Aggregator
 
+[![Release](https://github.com/TheRealMal/3x-ui-subs-aggregator/actions/workflows/release.yml/badge.svg)](https://github.com/TheRealMal/3x-ui-subs-aggregator/actions/workflows/release.yml)
+[![Go](https://img.shields.io/github/go-mod/go-version/TheRealMal/3x-ui-subs-aggregator)](https://go.dev/)
+[![Release](https://img.shields.io/github/v/release/TheRealMal/3x-ui-subs-aggregator)](https://github.com/TheRealMal/3x-ui-subs-aggregator/releases/latest)
+[![Swagger](https://img.shields.io/badge/swagger-docs-blue)](https://github.com/TheRealMal/3x-ui-subs-aggregator/blob/main/docs/swagger.yaml)
+
 A lightweight Go service that aggregates subscription configs from multiple [3X-UI](https://github.com/MHSanaei/3x-ui) panels into a single unified subscription endpoint.
 
 ## Quick Install
@@ -29,17 +34,18 @@ This downloads the latest release binary for your platform, installs it to `/usr
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/sub/{subId}` | None | Merged base64 URI subscription from all panels |
-| `GET` | `/admin/inbounds` | `?secret=` | List all inbounds from all panels |
-| `GET` | `/admin/sub-url/{name}` | `?secret=` | Get unified subscription URL by user name |
-| `POST` | `/admin/clients` | `?secret=` | Create client across all panels |
+| `GET` | `/admin/inbounds` | `Authorization` | List all inbounds from all panels |
+| `GET` | `/admin/sub-url/{name}` | `Authorization` | Get unified subscription URL by user name |
+| `POST` | `/admin/clients` | `Authorization` | Create client across all panels |
 | `GET` | `/health` | None | Health check |
 
-Admin endpoints require the `secret` query parameter matching `admin_secret` from the config.
+Admin endpoints require the `Authorization` header with the value matching `admin_secret` from the config.
 
 ### List Inbounds
 
 ```bash
-curl -s 'https://your-domain.com:8080/admin/inbounds?secret=your-secret' | jq
+curl -H 'Authorization: your-secret' \
+  'https://your-domain.com:8080/admin/inbounds' | jq
 ```
 
 Returns all inbounds from all configured panels with their IDs, remarks, protocols, ports, and enabled status. Use the **remark** values from this response as the `inbounds` parameter when creating a client.
@@ -47,7 +53,8 @@ Returns all inbounds from all configured panels with their IDs, remarks, protoco
 ### Create Client
 
 ```bash
-curl -s -X POST 'https://your-domain.com:8080/admin/clients?secret=your-secret' \
+curl -X POST 'https://your-domain.com:8080/admin/clients' \
+  -H 'Authorization: your-secret' \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "therealmal-mac",
@@ -69,7 +76,8 @@ The service generates a shared UUID for the client and adds it to every target i
 ### Get Subscription URL
 
 ```bash
-curl -s 'https://your-domain.com:8080/admin/sub-url/therealmal-mac?secret=your-secret' | jq
+curl -H 'Authorization: your-secret' \
+  'https://your-domain.com:8080/admin/sub-url/therealmal-mac' | jq
 ```
 
 Returns the unified subscription URL that aggregates configs for this user from all panels.
