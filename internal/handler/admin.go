@@ -48,6 +48,22 @@ func (h *AdminHandler) HandleGetSubURL(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, map[string]string{"url": subURL})
 }
 
+func (h *AdminHandler) HandleListInbounds(w http.ResponseWriter, r *http.Request) {
+	if !h.checkSecret(r) {
+		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
+		return
+	}
+
+	results, err := h.clientService.ListInboundsAcrossPanels(r.Context())
+	if err != nil {
+		h.logger.Error("failed to list inbounds", "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeSuccess(w, results)
+}
+
 func (h *AdminHandler) HandleCreateClient(w http.ResponseWriter, r *http.Request) {
 	if !h.checkSecret(r) {
 		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
@@ -62,10 +78,6 @@ func (h *AdminHandler) HandleCreateClient(w http.ResponseWriter, r *http.Request
 
 	if req.Name == "" {
 		writeError(w, http.StatusBadRequest, "name is required")
-		return
-	}
-	if len(req.InboundIDs) == 0 {
-		writeError(w, http.StatusBadRequest, "inboundIds is required")
 		return
 	}
 

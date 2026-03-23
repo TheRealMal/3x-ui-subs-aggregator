@@ -52,6 +52,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /sub/{subId}", subHandler.HandleSubscription)
+	mux.HandleFunc("GET /admin/inbounds", adminHandler.HandleListInbounds)
 	mux.HandleFunc("GET /admin/sub-url/{name}", adminHandler.HandleGetSubURL)
 	mux.HandleFunc("POST /admin/clients", adminHandler.HandleCreateClient)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

@@ -6,7 +6,6 @@ APP_DIR=$(cd "$(dirname "$0")/.." && pwd)
 BINARY="${APP_DIR}/${APP_NAME}"
 CONFIG="${APP_DIR}/configs/config.yaml"
 PID_FILE="${APP_DIR}/${APP_NAME}.pid"
-LOG_FILE="${APP_DIR}/${APP_NAME}.log"
 
 build() {
     cd "${APP_DIR}"
@@ -31,7 +30,7 @@ start() {
     fi
 
     echo "Starting ${APP_NAME}..."
-    nohup "${BINARY}" -config "${CONFIG}" >> "${LOG_FILE}" 2>&1 &
+    nohup "${BINARY}" -config "${CONFIG}" > /dev/null 2>&1 &
     echo $! > "${PID_FILE}"
     echo "${APP_NAME} started (PID: $!)."
 }
