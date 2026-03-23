@@ -65,6 +65,29 @@ definitions:
       panel:
         type: string
     type: object
+  service.UpdateClientResult:
+    properties:
+      email:
+        type: string
+      error:
+        type: string
+      inbound:
+        type: string
+      panel:
+        type: string
+      success:
+        type: boolean
+    type: object
+  service.UpdateExpiryRequest:
+    properties:
+      expiryTime:
+        type: integer
+    type: object
+  service.UpdateIPLimitRequest:
+    properties:
+      limitIp:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -115,6 +138,104 @@ paths:
       security:
       - AdminSecret: []
       summary: Create client across panels
+      tags:
+      - admin
+  /admin/clients/{name}/expiry:
+    patch:
+      consumes:
+      - application/json
+      description: Updates expiryTime for all client entries matching the given name
+        across all panels
+      parameters:
+      - description: Client name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Expiry update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateExpiryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.Response'
+            - properties:
+                obj:
+                  items:
+                    $ref: '#/definitions/service.UpdateClientResult'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      security:
+      - AdminSecret: []
+      summary: Update client expiry time
+      tags:
+      - admin
+  /admin/clients/{name}/ip-limit:
+    patch:
+      consumes:
+      - application/json
+      description: Updates limitIp for all client entries matching the given name
+        across all panels
+      parameters:
+      - description: Client name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: IP limit update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateIPLimitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.Response'
+            - properties:
+                obj:
+                  items:
+                    $ref: '#/definitions/service.UpdateClientResult'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      security:
+      - AdminSecret: []
+      summary: Update client IP limit
       tags:
       - admin
   /admin/inbounds:

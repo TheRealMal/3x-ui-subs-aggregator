@@ -37,6 +37,8 @@ This downloads the latest release binary for your platform, installs it to `/usr
 | `GET` | `/admin/inbounds` | `Authorization` | List all inbounds from all panels |
 | `GET` | `/admin/sub-url/{name}` | `Authorization` | Get unified subscription URL by user name |
 | `POST` | `/admin/clients` | `Authorization` | Create client across all panels |
+| `PATCH` | `/admin/clients/{name}/expiry` | `Authorization` | Update expiry time for all client entries matching name |
+| `PATCH` | `/admin/clients/{name}/ip-limit` | `Authorization` | Update IP limit for all client entries matching name |
 | `GET` | `/health` | None | Health check |
 
 Admin endpoints require the `Authorization` header with the value matching `admin_secret` from the config.
@@ -72,6 +74,36 @@ curl -X POST 'https://your-domain.com:8080/admin/clients' \
 - **`limitIp`** — max concurrent connections (0 = unlimited)
 
 The service generates a shared UUID for the client and adds it to every target inbound on every panel. For vmess/vless inbounds the UUID is used as the client ID; for trojan/shadowsocks it is used as the password.
+
+### Update Client Expiry
+
+```bash
+curl -X PATCH 'https://your-domain.com:8080/admin/clients/therealmal-mac/expiry' \
+  -H 'Authorization: your-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "expiryTime": 1735689600000
+  }' | jq
+```
+
+Updates the expiry time for all client entries whose email matches `therealmal-mac-N` across all panels and inbounds.
+
+- **`expiryTime`** — new expiration as unix timestamp in milliseconds (0 = never)
+
+### Update Client IP Limit
+
+```bash
+curl -X PATCH 'https://your-domain.com:8080/admin/clients/therealmal-mac/ip-limit' \
+  -H 'Authorization: your-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "limitIp": 3
+  }' | jq
+```
+
+Updates the concurrent connection limit for all client entries whose email matches `therealmal-mac-N` across all panels and inbounds.
+
+- **`limitIp`** — new max concurrent connections (0 = unlimited)
 
 ### Get Subscription URL
 

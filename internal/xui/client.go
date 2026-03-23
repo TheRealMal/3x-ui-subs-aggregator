@@ -138,6 +138,30 @@ func (c *APIClient) AddClient(ctx context.Context, inboundID int, client Client)
 	return nil
 }
 
+func (c *APIClient) UpdateClient(ctx context.Context, inboundID int, clientUUID string, client Client) error {
+	settings := InboundSettings{Clients: []Client{client}}
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshaling client settings: %w", err)
+	}
+
+	updateReq := AddClientRequest{
+		ID:       inboundID,
+		Settings: string(settingsJSON),
+	}
+
+	data, err := c.do(ctx, http.MethodPost, "panel/api/inbounds/updateClient/"+clientUUID, updateReq)
+	if err != nil {
+		return fmt.Errorf("updating client: %w", err)
+	}
+
+	if _, err := parseAPIResponse(data); err != nil {
+		return fmt.Errorf("updating client: %w", err)
+	}
+
+	return nil
+}
+
 func (c *APIClient) FetchSubscription(ctx context.Context, subId string) ([]byte, error) {
 	reqURL := c.subBaseURL() + c.panel.SubPath + subId
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)

@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 
 	"subs-aggregator/internal/xui"
 
@@ -38,6 +41,22 @@ type PanelInboundsResult struct {
 	Panel    string         `json:"panel"`
 	Inbounds []PanelInbound `json:"inbounds"`
 	Error    string         `json:"error,omitempty"`
+}
+
+type UpdateExpiryRequest struct {
+	ExpiryTime int64 `json:"expiryTime"`
+}
+
+type UpdateIPLimitRequest struct {
+	LimitIP int `json:"limitIp"`
+}
+
+type UpdateClientResult struct {
+	Panel   string `json:"panel"`
+	Inbound string `json:"inbound"`
+	Email   string `json:"email"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 }
 
 type ClientService struct {
@@ -210,6 +229,170 @@ func (s *ClientService) CreateClientAcrossPanels(ctx context.Context, req Create
 				Email:   email,
 				Success: true,
 			})
+		}
+	}
+
+	return results, nil
+}
+
+func matchesClientName(email, name string) bool {
+	prefix := name + "-"
+	if !strings.HasPrefix(email, prefix) {
+		return false
+	}
+	suffix := email[len(prefix):]
+	if suffix == "" {
+		return false
+	}
+	_, err := strconv.Atoi(suffix)
+	return err == nil
+}
+
+func clientUUID(protocol string, client xui.Client) string {
+	switch protocol {
+	case "trojan", "shadowsocks":
+		return client.Password
+	default:
+		return client.ID
+	}
+}
+
+// UpdateExpiryAcrossPanels updates expiryTime for all client entries matching the given name across all panels.
+func (s *ClientService) UpdateExpiryAcrossPanels(ctx context.Context, name string, req UpdateExpiryRequest) ([]UpdateClientResult, error) {
+	var results []UpdateClientResult
+
+	for _, panelClient := range s.clients {
+		inbounds, err := panelClient.ListInbounds(ctx)
+		if err != nil {
+			s.logger.Warn("failed to list inbounds", "panel", panelClient.PanelName(), "error", err)
+			results = append(results, UpdateClientResult{
+				Panel:   panelClient.PanelName(),
+				Success: false,
+				Error:   fmt.Sprintf("failed to list inbounds: %v", err),
+			})
+			continue
+		}
+
+		for _, inbound := range inbounds {
+			var settings xui.InboundSettings
+			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+				s.logger.Warn("failed to parse inbound settings",
+					"panel", panelClient.PanelName(),
+					"inbound", inbound.Remark,
+					"error", err,
+				)
+				continue
+			}
+
+			for _, client := range settings.Clients {
+				if !matchesClientName(client.Email, name) {
+					continue
+				}
+
+				client.ExpiryTime = req.ExpiryTime
+				uuid := clientUUID(inbound.Protocol, client)
+
+				if err := panelClient.UpdateClient(ctx, inbound.ID, uuid, client); err != nil {
+					s.logger.Warn("failed to update client expiry",
+						"panel", panelClient.PanelName(),
+						"inbound", inbound.Remark,
+						"email", client.Email,
+						"error", err,
+					)
+					results = append(results, UpdateClientResult{
+						Panel:   panelClient.PanelName(),
+						Inbound: inbound.Remark,
+						Email:   client.Email,
+						Success: false,
+						Error:   fmt.Sprintf("failed to update client: %v", err),
+					})
+					continue
+				}
+
+				s.logger.Info("client expiry updated",
+					"panel", panelClient.PanelName(),
+					"inbound", inbound.Remark,
+					"email", client.Email,
+					"expiryTime", req.ExpiryTime,
+				)
+				results = append(results, UpdateClientResult{
+					Panel:   panelClient.PanelName(),
+					Inbound: inbound.Remark,
+					Email:   client.Email,
+					Success: true,
+				})
+			}
+		}
+	}
+
+	return results, nil
+}
+
+// UpdateIPLimitAcrossPanels updates limitIp for all client entries matching the given name across all panels.
+func (s *ClientService) UpdateIPLimitAcrossPanels(ctx context.Context, name string, req UpdateIPLimitRequest) ([]UpdateClientResult, error) {
+	var results []UpdateClientResult
+
+	for _, panelClient := range s.clients {
+		inbounds, err := panelClient.ListInbounds(ctx)
+		if err != nil {
+			s.logger.Warn("failed to list inbounds", "panel", panelClient.PanelName(), "error", err)
+			results = append(results, UpdateClientResult{
+				Panel:   panelClient.PanelName(),
+				Success: false,
+				Error:   fmt.Sprintf("failed to list inbounds: %v", err),
+			})
+			continue
+		}
+
+		for _, inbound := range inbounds {
+			var settings xui.InboundSettings
+			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+				s.logger.Warn("failed to parse inbound settings",
+					"panel", panelClient.PanelName(),
+					"inbound", inbound.Remark,
+					"error", err,
+				)
+				continue
+			}
+
+			for _, client := range settings.Clients {
+				if !matchesClientName(client.Email, name) {
+					continue
+				}
+
+				client.LimitIP = req.LimitIP
+				uuid := clientUUID(inbound.Protocol, client)
+
+				if err := panelClient.UpdateClient(ctx, inbound.ID, uuid, client); err != nil {
+					s.logger.Warn("failed to update client IP limit",
+						"panel", panelClient.PanelName(),
+						"inbound", inbound.Remark,
+						"email", client.Email,
+						"error", err,
+					)
+					results = append(results, UpdateClientResult{
+						Panel:   panelClient.PanelName(),
+						Inbound: inbound.Remark,
+						Email:   client.Email,
+						Success: false,
+						Error:   fmt.Sprintf("failed to update client: %v", err),
+					})
+					continue
+				}
+
+				s.logger.Info("client IP limit updated",
+					"panel", panelClient.PanelName(),
+					"inbound", inbound.Remark,
+					"email", client.Email,
+					"limitIp", req.LimitIP,
+				)
+				results = append(results, UpdateClientResult{
+					Panel:   panelClient.PanelName(),
+					Inbound: inbound.Remark,
+					Email:   client.Email,
+					Success: true,
+				})
+			}
 		}
 	}
 
