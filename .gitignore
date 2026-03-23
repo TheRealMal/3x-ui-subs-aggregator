@@ -1,0 +1,6 @@
+/3x-ui-sub-unifier
+/unifier
+configs/config.yaml
+*.pid
+*.log
+.claude/

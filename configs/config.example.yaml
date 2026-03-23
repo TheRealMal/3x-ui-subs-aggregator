@@ -1,0 +1,19 @@
+# 3X-UI Subscription Unifier Configuration
+
+server:
+  port: 8080
+
+panels:
+  - name: "server-1"
+    address: "https://panel1.example.com:2053"
+    username: "admin"
+    password: "admin"
+    sub_path: "/sub"
+  - name: "server-2"
+    address: "https://panel2.example.com:2053"
+    username: "admin"
+    password: "admin"
+    sub_path: "/sub"
+
+log:
+  level: "info"
