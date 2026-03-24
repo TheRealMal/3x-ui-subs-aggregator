@@ -13,6 +13,26 @@ definitions:
       url:
         type: string
     type: object
+  service.ClientInbound:
+    properties:
+      email:
+        type: string
+      panel:
+        type: string
+      protocol:
+        type: string
+      remark:
+        type: string
+    type: object
+  service.ClientListEntry:
+    properties:
+      inbounds:
+        items:
+          $ref: '#/definitions/service.ClientInbound'
+        type: array
+      name:
+        type: string
+    type: object
   service.CreateClientRequest:
     properties:
       expiryTime:
@@ -97,6 +117,35 @@ info:
   version: "1.0"
 paths:
   /admin/clients:
+    get:
+      description: Returns all clients across all panels grouped by name
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.Response'
+            - properties:
+                obj:
+                  items:
+                    $ref: '#/definitions/service.ClientListEntry'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      security:
+      - AdminSecret: []
+      summary: List all clients
+      tags:
+      - admin
     post:
       consumes:
       - application/json

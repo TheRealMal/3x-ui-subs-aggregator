@@ -35,6 +35,7 @@ This downloads the latest release binary for your platform, installs it to `/usr
 |--------|------|------|-------------|
 | `GET` | `/sub/{subId}` | None | Merged base64 URI subscription from all panels |
 | `GET` | `/admin/inbounds` | `Authorization` | List all inbounds from all panels |
+| `GET` | `/admin/clients` | `Authorization` | List all clients grouped by name |
 | `GET` | `/admin/sub-url/{name}` | `Authorization` | Get unified subscription URL by user name |
 | `POST` | `/admin/clients` | `Authorization` | Create client across all panels |
 | `PATCH` | `/admin/clients/{name}/expiry` | `Authorization` | Update expiry time for all client entries matching name |
@@ -51,6 +52,15 @@ curl -H 'Authorization: your-secret' \
 ```
 
 Returns all inbounds from all configured panels with their IDs, remarks, protocols, ports, and enabled status. Use the **remark** values from this response as the `inbounds` parameter when creating a client.
+
+### List Clients
+
+```bash
+curl -H 'Authorization: your-secret' \
+  'https://your-domain.com:8080/admin/clients' | jq
+```
+
+Returns all clients across all panels grouped by name. The name is extracted from client emails (e.g. `therealmal-1`, `therealmal-2` → `therealmal`).
 
 ### Create Client
 

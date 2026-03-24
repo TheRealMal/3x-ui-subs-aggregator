@@ -89,6 +89,33 @@ func (h *AdminHandler) HandleListInbounds(w http.ResponseWriter, r *http.Request
 	writeSuccess(w, results)
 }
 
+// HandleListClients godoc
+//
+//	@Summary		List all clients
+//	@Description	Returns all clients across all panels grouped by name
+//	@Tags			admin
+//	@Produce		json
+//	@Success		200		{object}	Response{obj=[]service.ClientListEntry}
+//	@Failure		401		{object}	Response
+//	@Failure		500		{object}	Response
+//	@Security		AdminSecret
+//	@Router			/admin/clients [get]
+func (h *AdminHandler) HandleListClients(w http.ResponseWriter, r *http.Request) {
+	if !h.checkSecret(r) {
+		writeError(w, http.StatusUnauthorized, "invalid or missing secret")
+		return
+	}
+
+	results, err := h.clientService.ListClientsAcrossPanels(r.Context())
+	if err != nil {
+		h.logger.Error("failed to list clients", "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeSuccess(w, results)
+}
+
 // HandleCreateClient godoc
 //
 //	@Summary		Create client across panels

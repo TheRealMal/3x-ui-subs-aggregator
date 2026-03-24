@@ -43,6 +43,18 @@ type PanelInboundsResult struct {
 	Error    string         `json:"error,omitempty"`
 }
 
+type ClientInbound struct {
+	Panel    string `json:"panel"`
+	Remark   string `json:"remark"`
+	Protocol string `json:"protocol"`
+	Email    string `json:"email"`
+}
+
+type ClientListEntry struct {
+	Name     string          `json:"name"`
+	Inbounds []ClientInbound `json:"inbounds"`
+}
+
 type UpdateExpiryRequest struct {
 	ExpiryTime int64 `json:"expiryTime"`
 }
@@ -104,6 +116,67 @@ func (s *ClientService) ListInboundsAcrossPanels(ctx context.Context) ([]PanelIn
 	}
 
 	return results, nil
+}
+
+// ListClientsAcrossPanels returns all clients grouped by name extracted from email (email format: name-<N>).
+func (s *ClientService) ListClientsAcrossPanels(ctx context.Context) ([]ClientListEntry, error) {
+	clientMap := make(map[string][]ClientInbound)
+
+	for _, panelClient := range s.clients {
+		inbounds, err := panelClient.ListInbounds(ctx)
+		if err != nil {
+			s.logger.Warn("failed to list inbounds", "panel", panelClient.PanelName(), "error", err)
+			continue
+		}
+
+		for _, inbound := range inbounds {
+			var settings xui.InboundSettings
+			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+				s.logger.Warn("failed to parse inbound settings",
+					"panel", panelClient.PanelName(),
+					"inbound", inbound.Remark,
+					"error", err,
+				)
+				continue
+			}
+
+			for _, client := range settings.Clients {
+				name := extractClientName(client.Email)
+				if name == "" {
+					continue
+				}
+				clientMap[name] = append(clientMap[name], ClientInbound{
+					Panel:    panelClient.PanelName(),
+					Remark:   inbound.Remark,
+					Protocol: inbound.Protocol,
+					Email:    client.Email,
+				})
+			}
+		}
+	}
+
+	results := make([]ClientListEntry, 0, len(clientMap))
+	for name, inbounds := range clientMap {
+		results = append(results, ClientListEntry{
+			Name:     name,
+			Inbounds: inbounds,
+		})
+	}
+
+	return results, nil
+}
+
+// extractClientName extracts the base name from an email like "name-1", "name-2", etc.
+func extractClientName(email string) string {
+	lastDash := strings.LastIndex(email, "-")
+	if lastDash < 1 {
+		return ""
+	}
+	suffix := email[lastDash+1:]
+	if _, err := strconv.Atoi(suffix); err != nil {
+		return ""
+	}
+	return email[:lastDash]
 }
 
 // CreateClientAcrossPanels creates a client with the same credentials across all panels and requested inbounds.

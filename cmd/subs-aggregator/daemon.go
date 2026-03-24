@@ -86,6 +86,7 @@ func cmdRun(cfgPath string) {
 	mux.HandleFunc("GET /sub/{subId}", subHandler.HandleSubscription)
 	mux.HandleFunc("GET /admin/inbounds", adminHandler.HandleListInbounds)
 	mux.HandleFunc("GET /admin/sub-url/{name}", adminHandler.HandleGetSubURL)
+	mux.HandleFunc("GET /admin/clients", adminHandler.HandleListClients)
 	mux.HandleFunc("POST /admin/clients", adminHandler.HandleCreateClient)
 	mux.HandleFunc("PATCH /admin/clients/{name}/expiry", adminHandler.HandleUpdateExpiry)
 	mux.HandleFunc("PATCH /admin/clients/{name}/ip-limit", adminHandler.HandleUpdateIPLimit)
