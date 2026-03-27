@@ -202,7 +202,7 @@ func (c *APIClient) GetClientTraffic(ctx context.Context, email string) (*Client
 	return &traffic, nil
 }
 
-// do executes an authenticated API request with automatic re-login on 401.
+// do executes an authenticated API request with automatic re-login on session expiry.
 func (c *APIClient) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	if err := c.ensureLoggedIn(ctx); err != nil {
 		return nil, err
@@ -222,8 +222,17 @@ func (c *APIClient) do(ctx context.Context, method, path string, body any) ([]by
 		return nil, err
 	}
 
-	// Treat 401 or 3xx redirects (e.g. redirect to login page) as session expired.
-	if statusCode == http.StatusUnauthorized || (statusCode >= 300 && statusCode < 400) {
+	// Detect expired session and re-login once.
+	// 3X-UI returns HTTP 200 with {"success":false} for expired sessions
+	// (the panel almost never uses 401/3xx), so we must also check the
+	// API-level success flag.
+	if c.isSessionExpired(statusCode, data) {
+		c.logger.Debug("session expired, re-logging in",
+			"panel", c.panel.Name,
+			"method", method,
+			"path", path,
+			"status", statusCode,
+		)
 		c.loggedIn.Store(false)
 		if err := c.ensureLoggedIn(ctx); err != nil {
 			return nil, err
@@ -243,6 +252,23 @@ func (c *APIClient) do(ctx context.Context, method, path string, body any) ([]by
 	}
 
 	return data, nil
+}
+
+// isSessionExpired checks whether the response indicates the session cookie
+// has become stale and a fresh login is needed.
+// 3X-UI panels behave differently depending on version and reverse-proxy
+// setup: expired sessions may produce 401, 3xx redirects, 404 (secret base
+// path hiding), 200 + {"success":false}, or 200 + HTML login page.
+// Instead of enumerating failures, we treat any response that is NOT a clear
+// 200 + {"success":true} as a potential session issue and retry once.
+func (c *APIClient) isSessionExpired(statusCode int, data []byte) bool {
+	if statusCode == http.StatusOK && len(data) > 0 {
+		var resp APIResponse
+		if json.Unmarshal(data, &resp) == nil && resp.Success {
+			return false // definitive success — session is alive
+		}
+	}
+	return true
 }
 
 func (c *APIClient) ensureLoggedIn(ctx context.Context) error {
