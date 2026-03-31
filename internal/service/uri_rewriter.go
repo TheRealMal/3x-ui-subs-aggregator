@@ -13,12 +13,19 @@ import (
 	"subs-aggregator/internal/xui"
 )
 
+// fallbackRoute describes how traffic reaches a secondary inbound via the master.
+// Exactly one of Path or SNI is set.
+type fallbackRoute struct {
+	Path string // URL path trigger, e.g. "/de-access".
+	SNI  string // SNI-based trigger, e.g. "de.yourdomain.com".
+}
+
 // fallbackMapping holds the per-panel mapping from local dest port to
-// the master inbound's external port, host, and the fallback path.
+// the master inbound's external port, host, and the route (path or SNI).
 type fallbackMapping struct {
-	masterHost string         // Public host extracted from master inbound's URI (e.g. "1.2.3.4").
-	masterPort int            // The master inbound's external port (e.g. 443).
-	portToPath map[int]string // Secondary dest port -> fallback path, e.g. {10001: "/de-access"}.
+	masterHost  string                // Public host extracted from master inbound's URI (e.g. "1.2.3.4").
+	masterPort  int                   // The master inbound's external port (e.g. 443).
+	portToRoute map[int]fallbackRoute // Secondary dest port -> route info.
 }
 
 // buildFallbackMapping scans a panel's inbounds for one that has VLESS fallback
@@ -34,11 +41,11 @@ func buildFallbackMapping(inbounds []xui.Inbound, logger *slog.Logger) *fallback
 		}
 
 		m := &fallbackMapping{
-			masterPort: inb.Port,
-			portToPath: make(map[int]string),
+			masterPort:  inb.Port,
+			portToRoute: make(map[int]fallbackRoute),
 		}
 		for _, fb := range settings.Fallbacks {
-			if fb.Path == "" {
+			if fb.Path == "" && fb.Name == "" {
 				continue // default fallback (e.g. dest:80), skip
 			}
 			port, ok := fb.DestPort()
@@ -49,10 +56,13 @@ func buildFallbackMapping(inbounds []xui.Inbound, logger *slog.Logger) *fallback
 				)
 				continue
 			}
-			m.portToPath[port] = fb.Path
+			m.portToRoute[port] = fallbackRoute{
+				Path: fb.Path,
+				SNI:  fb.Name,
+			}
 		}
-		if len(m.portToPath) == 0 {
-			continue // had fallbacks but none with paths
+		if len(m.portToRoute) == 0 {
+			continue // had fallbacks but none with paths or SNI
 		}
 		return m
 	}
@@ -157,7 +167,7 @@ func rewriteStandardURI(uri string, mapping *fallbackMapping) string {
 		return uri
 	}
 
-	path, ok := mapping.portToPath[port]
+	route, ok := mapping.portToRoute[port]
 	if !ok {
 		return uri
 	}
@@ -168,7 +178,13 @@ func rewriteStandardURI(uri string, mapping *fallbackMapping) string {
 	}
 	u.Host = net.JoinHostPort(newHost, strconv.Itoa(mapping.masterPort))
 	q := u.Query()
-	q.Set("path", path)
+	if route.Path != "" {
+		q.Set("path", route.Path)
+	}
+	if route.SNI != "" {
+		q.Set("sni", route.SNI)
+		q.Set("host", route.SNI)
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }
@@ -192,7 +208,7 @@ func rewriteVmessURI(uri string, mapping *fallbackMapping) string {
 		return uri
 	}
 
-	path, ok := mapping.portToPath[port]
+	route, ok := mapping.portToRoute[port]
 	if !ok {
 		return uri
 	}
@@ -204,7 +220,13 @@ func rewriteVmessURI(uri string, mapping *fallbackMapping) string {
 	default:
 		obj["port"] = mapping.masterPort
 	}
-	obj["path"] = path
+	if route.Path != "" {
+		obj["path"] = route.Path
+	}
+	if route.SNI != "" {
+		obj["sni"] = route.SNI
+		obj["host"] = route.SNI
+	}
 	if mapping.masterHost != "" {
 		obj["add"] = mapping.masterHost
 	}
@@ -232,7 +254,7 @@ func rewriteShadowsocksURI(uri string, mapping *fallbackMapping) string {
 		return uri
 	}
 
-	path, ok := mapping.portToPath[port]
+	route, ok := mapping.portToRoute[port]
 	if !ok {
 		return uri
 	}
@@ -243,7 +265,13 @@ func rewriteShadowsocksURI(uri string, mapping *fallbackMapping) string {
 	}
 	u.Host = net.JoinHostPort(newHost, strconv.Itoa(mapping.masterPort))
 	q := u.Query()
-	q.Set("path", path)
+	if route.Path != "" {
+		q.Set("path", route.Path)
+	}
+	if route.SNI != "" {
+		q.Set("sni", route.SNI)
+		q.Set("host", route.SNI)
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }

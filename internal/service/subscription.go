@@ -117,7 +117,7 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 				s.logger.Info("applying fallback rewriting",
 					"panel", res.panel,
 					"masterPort", mapping.masterPort,
-					"mappings", len(mapping.portToPath),
+					"mappings", len(mapping.portToRoute),
 				)
 				uris = rewriteURIs(uris, mapping)
 			}
