@@ -14,8 +14,9 @@ import (
 )
 
 // fallbackMapping holds the per-panel mapping from local dest port to
-// the master inbound's external port and the fallback path.
+// the master inbound's external port, host, and the fallback path.
 type fallbackMapping struct {
+	masterHost string         // Public host extracted from master inbound's URI (e.g. "1.2.3.4").
 	masterPort int            // The master inbound's external port (e.g. 443).
 	portToPath map[int]string // Secondary dest port -> fallback path, e.g. {10001: "/de-access"}.
 }
@@ -59,17 +60,69 @@ func buildFallbackMapping(inbounds []xui.Inbound, logger *slog.Logger) *fallback
 }
 
 // rewriteURIs rewrites subscription URIs so that secondary inbound ports
-// are replaced with the master port and the fallback path is injected.
+// are replaced with the master port/host and the fallback path is injected.
 // If mapping is nil, URIs are returned unchanged.
 func rewriteURIs(uris []string, mapping *fallbackMapping) []string {
 	if mapping == nil {
 		return uris
 	}
+	// First pass: extract the public host from a URI that uses the master port.
+	mapping.masterHost = extractMasterHost(uris, mapping.masterPort)
+
 	out := make([]string, len(uris))
 	for i, uri := range uris {
 		out[i] = rewriteURI(uri, mapping)
 	}
 	return out
+}
+
+// extractMasterHost finds the first URI whose port matches masterPort and
+// returns its host (the public address clients should connect to).
+func extractMasterHost(uris []string, masterPort int) string {
+	for _, uri := range uris {
+		host, port := extractHostPort(uri)
+		if port == masterPort && host != "" {
+			return host
+		}
+	}
+	return ""
+}
+
+// extractHostPort returns the host and port from a proxy URI, regardless of protocol.
+func extractHostPort(uri string) (string, int) {
+	switch {
+	case strings.HasPrefix(uri, "vmess://"):
+		encoded := strings.TrimPrefix(uri, "vmess://")
+		decoded, err := decodeBase64Bytes(encoded)
+		if err != nil {
+			return "", 0
+		}
+		var obj map[string]any
+		if json.Unmarshal(decoded, &obj) != nil {
+			return "", 0
+		}
+		host, _ := obj["add"].(string)
+		port, ok := jsonPort(obj["port"])
+		if !ok {
+			return "", 0
+		}
+		return host, port
+	default:
+		// vless://, trojan://, ss:// all use standard URI format
+		u, err := url.Parse(uri)
+		if err != nil {
+			return "", 0
+		}
+		host, portStr, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			return "", 0
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return "", 0
+		}
+		return host, port
+	}
 }
 
 func rewriteURI(uri string, mapping *fallbackMapping) string {
@@ -109,7 +162,11 @@ func rewriteStandardURI(uri string, mapping *fallbackMapping) string {
 		return uri
 	}
 
-	u.Host = net.JoinHostPort(host, strconv.Itoa(mapping.masterPort))
+	newHost := host
+	if mapping.masterHost != "" {
+		newHost = mapping.masterHost
+	}
+	u.Host = net.JoinHostPort(newHost, strconv.Itoa(mapping.masterPort))
 	q := u.Query()
 	q.Set("path", path)
 	u.RawQuery = q.Encode()
@@ -148,6 +205,9 @@ func rewriteVmessURI(uri string, mapping *fallbackMapping) string {
 		obj["port"] = mapping.masterPort
 	}
 	obj["path"] = path
+	if mapping.masterHost != "" {
+		obj["add"] = mapping.masterHost
+	}
 
 	data, err := json.Marshal(obj)
 	if err != nil {
@@ -177,7 +237,11 @@ func rewriteShadowsocksURI(uri string, mapping *fallbackMapping) string {
 		return uri
 	}
 
-	u.Host = net.JoinHostPort(host, strconv.Itoa(mapping.masterPort))
+	newHost := host
+	if mapping.masterHost != "" {
+		newHost = mapping.masterHost
+	}
+	u.Host = net.JoinHostPort(newHost, strconv.Itoa(mapping.masterPort))
 	q := u.Query()
 	q.Set("path", path)
 	u.RawQuery = q.Encode()
