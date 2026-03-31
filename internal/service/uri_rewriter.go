@@ -180,6 +180,7 @@ func rewriteStandardURI(uri string, mapping *fallbackMapping) string {
 	q := u.Query()
 	if route.Path != "" {
 		q.Set("path", route.Path)
+		q.Set("type", "http")
 	}
 	if route.SNI != "" {
 		q.Set("sni", route.SNI)
@@ -222,6 +223,7 @@ func rewriteVmessURI(uri string, mapping *fallbackMapping) string {
 	}
 	if route.Path != "" {
 		obj["path"] = route.Path
+		obj["net"] = "http"
 	}
 	if route.SNI != "" {
 		obj["sni"] = route.SNI
@@ -267,6 +269,7 @@ func rewriteShadowsocksURI(uri string, mapping *fallbackMapping) string {
 	q := u.Query()
 	if route.Path != "" {
 		q.Set("path", route.Path)
+		q.Set("type", "http")
 	}
 	if route.SNI != "" {
 		q.Set("sni", route.SNI)
