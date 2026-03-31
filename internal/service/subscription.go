@@ -43,9 +43,11 @@ func BuildSubURL(host, name, profileTitle string) string {
 }
 
 type subscriptionResult struct {
-	panel string
-	data  []byte
-	err   error
+	panel    string
+	data     []byte
+	err      error
+	inbounds []xui.Inbound
+	inbErr   error
 }
 
 // MergeSubscriptions fetches base64-encoded URI subscriptions from all panels
@@ -58,11 +60,14 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			inbounds, inbErr := panelClient.ListInbounds(ctx)
 			data, err := panelClient.FetchSubscription(ctx, subId)
 			results[i] = subscriptionResult{
-				panel: panelClient.PanelName(),
-				data:  data,
-				err:   err,
+				panel:    panelClient.PanelName(),
+				data:     data,
+				err:      err,
+				inbounds: inbounds,
+				inbErr:   inbErr,
 			}
 		}()
 	}
@@ -93,12 +98,32 @@ func (s *SubscriptionService) MergeSubscriptions(ctx context.Context, subId stri
 			continue
 		}
 
+		var uris []string
 		for _, line := range strings.Split(decoded, "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" {
-				allURIs = append(allURIs, line)
+				uris = append(uris, line)
 			}
 		}
+
+		if res.inbErr != nil {
+			s.logger.Warn("failed to fetch inbounds for fallback detection, skipping rewrite",
+				"panel", res.panel,
+				"error", res.inbErr,
+			)
+		} else {
+			mapping := buildFallbackMapping(res.inbounds, s.logger)
+			if mapping != nil {
+				s.logger.Info("applying fallback rewriting",
+					"panel", res.panel,
+					"masterPort", mapping.masterPort,
+					"mappings", len(mapping.portToPath),
+				)
+				uris = rewriteURIs(uris, mapping)
+			}
+		}
+
+		allURIs = append(allURIs, uris...)
 		successCount++
 	}
 

@@ -1,6 +1,10 @@
 package xui
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"net"
+	"strconv"
+)
 
 type APIResponse struct {
 	Success bool            `json:"success"`
@@ -19,7 +23,38 @@ type Inbound struct {
 }
 
 type InboundSettings struct {
-	Clients []Client `json:"clients"`
+	Clients   []Client   `json:"clients"`
+	Fallbacks []Fallback `json:"fallbacks,omitempty"`
+}
+
+type Fallback struct {
+	Name string          `json:"name,omitempty"`
+	Path string          `json:"path,omitempty"`
+	Dest json.RawMessage `json:"dest"`
+	Xver int             `json:"xver,omitempty"`
+}
+
+// DestPort extracts the destination port from the Dest field,
+// which can be a JSON number (10001) or string ("10001" or "127.0.0.1:10001").
+func (f *Fallback) DestPort() (int, bool) {
+	var port int
+	if json.Unmarshal(f.Dest, &port) == nil {
+		return port, true
+	}
+
+	var s string
+	if json.Unmarshal(f.Dest, &s) == nil {
+		if p, err := strconv.Atoi(s); err == nil {
+			return p, true
+		}
+		if _, portStr, err := net.SplitHostPort(s); err == nil {
+			if p, err := strconv.Atoi(portStr); err == nil {
+				return p, true
+			}
+		}
+	}
+
+	return 0, false
 }
 
 type Client struct {
