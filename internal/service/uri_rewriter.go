@@ -32,8 +32,8 @@ type fallbackMapping struct {
 // rules configured. Returns nil if no fallbacks are found.
 func buildFallbackMapping(inbounds []xui.Inbound, logger *slog.Logger) *fallbackMapping {
 	for _, inb := range inbounds {
-		var settings xui.InboundSettings
-		if err := json.Unmarshal([]byte(inb.Settings), &settings); err != nil {
+		settings, err := inb.ParseSettings()
+		if err != nil {
 			continue
 		}
 		if len(settings.Fallbacks) == 0 {

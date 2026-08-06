@@ -138,6 +138,37 @@ Each panel also has separate ports for the API and subscription endpoints:
 
 The `address` field should contain only the scheme and host (e.g., `https://panel.example.com`), without any port or path.
 
+## Panel Authentication
+
+Each panel accepts either credential form:
+
+- **`username` + `password`** — a session login. On 3X-UI v3+ the panel enforces CSRF on
+  every unsafe request, so the service mints a token from `<base_path>csrf-token` and
+  replays it in the `X-CSRF-Token` header, refreshing it automatically when a session
+  rotates or a token is rejected.
+- **`api_token`** — a Bearer token created in the panel under **Settings → Security → API
+  Token** (v3+ only). Recommended for a long-running service: it carries no session that
+  can expire and the panel short-circuits CSRF for token-authenticated requests. When set,
+  `username`/`password` may be omitted; the token is verified at startup so a revoked or
+  disabled token fails immediately rather than at the first subscription fetch.
+
+## Panel Version Compatibility
+
+Both 3X-UI generations are supported, detected per panel at startup by probing for the
+`csrf-token` endpoint. The API changed substantially in v3, and the service adapts:
+
+| Operation | v2 (legacy) | v3+ |
+| --- | --- | --- |
+| Login | form POST, no CSRF | JSON POST + `X-CSRF-Token` |
+| Add client | `inbounds/addClient` | `clients/add` (`{client, inboundIds}`) |
+| Update client | `inbounds/updateClient/{uuid}` | `clients/update/{email}` |
+| Client traffic | `inbounds/getClientTraffics/{email}` | `clients/traffic/{email}` |
+| Inbound `settings` | JSON-encoded string | nested JSON object |
+
+Because a v3 update **replaces** the stored client row rather than merging into it,
+partial updates (expiry, IP limit) are applied on top of the panel's own record, so
+fields this service does not manage are preserved.
+
 ## Subscription Output
 
 The `/sub/{subId}` endpoint returns a **base64-encoded** list of proxy URIs (one per line), compatible with HApp (Hiddify) and Shadowrocket. Response headers include:
@@ -205,6 +236,8 @@ The `/sub/{subId}` endpoint returns a **base64-encoded** list of proxy URIs (one
          sub_path: "/sub/"    # Sub URI Path from 3X-UI panel settings (starts and ends with /)
       - name: "server-2"
          address: "https://panel2.example.com"
+         # v3+ panels: a Bearer token from Settings -> Security -> API Token
+         # can replace username/password entirely.
          username: "admin"
          password: "admin"
          api_port: 2053

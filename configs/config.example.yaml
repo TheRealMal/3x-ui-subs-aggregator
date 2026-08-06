@@ -14,6 +14,9 @@ server:
     #   1. /root/cert/<domain>/{fullchain.pem,privkey.pem|cert.pem,key.pem|fullchain.cer,privkey.key}
     #   2. /root/cert/ip/<ip>/{same patterns}
 
+# Both 3X-UI generations are supported; the version is detected per panel:
+#   v3+ : clients are first-class rows, and session logins must carry a CSRF token
+#   v2  : clients live inside each inbound's settings blob
 panels:
   - name: "server-1"
     address: "https://panel1.example.com" # scheme and host only, no port or trailing slash
@@ -25,8 +28,11 @@ panels:
     sub_path: "/sub/"    # Sub URI Path from 3X-UI panel settings (starts and ends with /)
   - name: "server-2"
     address: "https://panel2.example.com"
-    username: "admin"
-    password: "admin"
+    # 3X-UI v3+ only: Bearer token from Settings -> Security -> API Token.
+    # Preferred for a long-running service — it replaces username/password,
+    # never expires like a session, and bypasses CSRF entirely.
+    # When set, username and password may be omitted.
+    api_token: "your-api-token"
     api_port: 2053
     sub_port: 443
     base_path: "/another-admin/"

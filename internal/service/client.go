@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -130,8 +129,8 @@ func (s *ClientService) ListClientsAcrossPanels(ctx context.Context) ([]ClientLi
 		}
 
 		for _, inbound := range inbounds {
-			var settings xui.InboundSettings
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+			settings, err := inbound.ParseSettings()
+			if err != nil {
 				s.logger.Warn("failed to parse inbound settings",
 					"panel", panelClient.PanelName(),
 					"inbound", inbound.Remark,
@@ -321,15 +320,6 @@ func matchesClientName(email, name string) bool {
 	return err == nil
 }
 
-func clientUUID(protocol string, client xui.Client) string {
-	switch protocol {
-	case "trojan", "shadowsocks":
-		return client.Password
-	default:
-		return client.ID
-	}
-}
-
 // UpdateExpiryAcrossPanels updates expiryTime for all client entries matching the given name across all panels.
 func (s *ClientService) UpdateExpiryAcrossPanels(ctx context.Context, name string, req UpdateExpiryRequest) ([]UpdateClientResult, error) {
 	var results []UpdateClientResult
@@ -347,8 +337,8 @@ func (s *ClientService) UpdateExpiryAcrossPanels(ctx context.Context, name strin
 		}
 
 		for _, inbound := range inbounds {
-			var settings xui.InboundSettings
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+			settings, err := inbound.ParseSettings()
+			if err != nil {
 				s.logger.Warn("failed to parse inbound settings",
 					"panel", panelClient.PanelName(),
 					"inbound", inbound.Remark,
@@ -362,10 +352,9 @@ func (s *ClientService) UpdateExpiryAcrossPanels(ctx context.Context, name strin
 					continue
 				}
 
-				client.ExpiryTime = req.ExpiryTime
-				uuid := clientUUID(inbound.Protocol, client)
+				patch := xui.ClientPatch{ExpiryTime: &req.ExpiryTime}
 
-				if err := panelClient.UpdateClient(ctx, inbound.ID, uuid, client); err != nil {
+				if err := panelClient.PatchClient(ctx, inbound, client, patch); err != nil {
 					s.logger.Warn("failed to update client expiry",
 						"panel", panelClient.PanelName(),
 						"inbound", inbound.Remark,
@@ -418,8 +407,8 @@ func (s *ClientService) UpdateIPLimitAcrossPanels(ctx context.Context, name stri
 		}
 
 		for _, inbound := range inbounds {
-			var settings xui.InboundSettings
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+			settings, err := inbound.ParseSettings()
+			if err != nil {
 				s.logger.Warn("failed to parse inbound settings",
 					"panel", panelClient.PanelName(),
 					"inbound", inbound.Remark,
@@ -433,10 +422,9 @@ func (s *ClientService) UpdateIPLimitAcrossPanels(ctx context.Context, name stri
 					continue
 				}
 
-				client.LimitIP = req.LimitIP
-				uuid := clientUUID(inbound.Protocol, client)
+				patch := xui.ClientPatch{LimitIP: &req.LimitIP}
 
-				if err := panelClient.UpdateClient(ctx, inbound.ID, uuid, client); err != nil {
+				if err := panelClient.PatchClient(ctx, inbound, client, patch); err != nil {
 					s.logger.Warn("failed to update client IP limit",
 						"panel", panelClient.PanelName(),
 						"inbound", inbound.Remark,

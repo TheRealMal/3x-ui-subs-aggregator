@@ -53,6 +53,11 @@ type PanelConfig struct {
 	Address  string `yaml:"address"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+	// APIToken is a Bearer token minted in the panel under
+	// Settings -> Security -> API Token (3X-UI v3+). When set it replaces the
+	// username/password session login and bypasses CSRF entirely, which makes
+	// it the preferred credential for a long-running service.
+	APIToken string `yaml:"api_token"`
 	APIPort  int    `yaml:"api_port"`
 	SubPort  int    `yaml:"sub_port"`
 	BasePath string `yaml:"base_path"`
@@ -121,11 +126,14 @@ func (c *Config) validate() error {
 		if p.Address == "" {
 			return fmt.Errorf("panel %d: address is required", i)
 		}
-		if p.Username == "" {
-			return fmt.Errorf("panel %d: username is required", i)
-		}
-		if p.Password == "" {
-			return fmt.Errorf("panel %d: password is required", i)
+		// Either a Bearer API token or a username/password pair must be present.
+		if p.APIToken == "" {
+			if p.Username == "" {
+				return fmt.Errorf("panel %d: username is required (or set api_token)", i)
+			}
+			if p.Password == "" {
+				return fmt.Errorf("panel %d: password is required (or set api_token)", i)
+			}
 		}
 	}
 
